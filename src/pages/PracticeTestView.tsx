@@ -1,44 +1,248 @@
-import { useState, useEffect, useCallback } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
 import {
-  ArrowLeft, Timer, CheckCircle, XCircle, ChevronRight,
-  RotateCcw, AlertTriangle, Shield
+  AlertTriangle,
+  ArrowLeft,
+  CheckCircle,
+  ChevronRight,
+  Clock3,
+  Play,
+  RotateCcw,
+  Target,
+  Timer,
+  Trophy,
+  XCircle,
 } from "lucide-react";
+import BrandLockup from "@/components/brand/BrandLockup";
+import { Button } from "@/components/ui/button";
 import { practiceTests } from "@/data/courseData";
+import {
+  FREE_PREVIEW_TEST_ID,
+  canViewDetailedAnswerFeedback,
+  canAccessTest,
+  isPreviewTestQuestionUnlocked,
+} from "@/lib/access";
+import {
+  getBestPracticeAttempt,
+  getPracticeAttempts,
+  savePracticeAttempt,
+  type PracticeAttemptRecord,
+} from "@/lib/practiceTestStorage";
+
+const formatClock = (seconds: number) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+};
+
+const formatDuration = (seconds: number) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return secs === 0 ? `${mins} min` : `${mins}m ${secs}s`;
+};
+
+const formatAttemptDate = (isoString: string) =>
+  new Intl.DateTimeFormat("en-CA", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(isoString));
+
+interface ProgressPanelProps {
+  answers: Array<number | null>;
+  currentQ: number;
+  totalQuestions: number;
+  timeLeft: number;
+  onGoToQuestion: (index: number) => void;
+  compact?: boolean;
+}
+
+const LockedMask = ({
+  title,
+  body,
+}: {
+  title: string;
+  body: string;
+}) => (
+  <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] bg-background/45 backdrop-blur-[6px]">
+    <div className="mx-4 max-w-md rounded-3xl border border-border/70 bg-background/92 p-6 text-center shadow-2xl">
+      <div className="w-14 h-14 rounded-2xl bg-muted mx-auto mb-4 flex items-center justify-center">
+        <AlertTriangle className="h-7 w-7 text-accent" />
+      </div>
+      <h3 className="font-heading text-2xl font-semibold text-foreground mb-2">{title}</h3>
+      <p className="text-sm text-muted-foreground leading-relaxed mb-5">{body}</p>
+      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        <a href="/signup?step=plan">
+          <Button variant="hero">Unlock Full Access</Button>
+        </a>
+        <Link to={`/test/${FREE_PREVIEW_TEST_ID}`}>
+          <Button variant="outline">Open Free Sample</Button>
+        </Link>
+      </div>
+    </div>
+  </div>
+);
+
+const ProgressPanel = ({
+  answers,
+  currentQ,
+  totalQuestions,
+  timeLeft,
+  onGoToQuestion,
+  compact = false,
+}: ProgressPanelProps) => {
+  const answered = answers.filter((answer) => answer !== null).length;
+  const completion = Math.round((answered / totalQuestions) * 100);
+
+  return (
+    <div className={`glass-card rounded-2xl border border-border/60 ${compact ? "p-4" : "p-5"}`}>
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div>
+          <p className="text-xs font-semibold tracking-[0.24em] uppercase text-muted-foreground">Test progress</p>
+          <p className="text-lg font-heading font-semibold text-foreground mt-1">{answered} of {totalQuestions} answered</p>
+        </div>
+        <div className="rounded-xl bg-navy px-3 py-2 text-primary-foreground">
+          <p className="text-[10px] uppercase tracking-[0.24em] text-primary-foreground/60">Time left</p>
+          <p className={`font-mono text-lg font-bold ${timeLeft < 60 ? "text-destructive" : "text-accent"}`}>
+            {formatClock(timeLeft)}
+          </p>
+        </div>
+      </div>
+
+      <div className="w-full rounded-full bg-muted h-2 overflow-hidden mb-4">
+        <div className="h-full gradient-accent rounded-full transition-all duration-300" style={{ width: `${completion}%` }} />
+      </div>
+
+      <div className="grid gap-2 grid-cols-5">
+        {answers.map((answer, index) => (
+          <button
+            key={index}
+            onClick={() => onGoToQuestion(index)}
+            className={`h-10 rounded-xl text-sm font-semibold transition-all ${
+              index === currentQ
+                ? "gradient-accent text-accent-foreground shadow-md"
+                : answer !== null
+                  ? "bg-navy text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted-foreground/15"
+            }`}
+          >
+            {index + 1}
+          </button>
+        ))}
+      </div>
+
+      {!compact && (
+        <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mt-4">
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-accent" />
+            Current question
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-navy" />
+            Answered
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/30" />
+            Remaining
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-gold" />
+            Timed attempt
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const PracticeTestView = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
-  const test = practiceTests.find(t => t.id === id);
+  const test = practiceTests.find((item) => item.id === id);
+  const locked = test ? !canAccessTest(test.id) : false;
 
   const [phase, setPhase] = useState<"intro" | "active" | "review">("intro");
   const [currentQ, setCurrentQ] = useState(0);
-  const [answers, setAnswers] = useState<(number | null)[]>([]);
+  const [answers, setAnswers] = useState<Array<number | null>>([]);
   const [timeLeft, setTimeLeft] = useState(0);
   const [showExplanation, setShowExplanation] = useState<number | null>(null);
+  const [attemptHistory, setAttemptHistory] = useState<PracticeAttemptRecord[]>([]);
+  const [startedAt, setStartedAt] = useState<string | null>(null);
+  const [reviewMeta, setReviewMeta] = useState<{ completedAt: string; timedOut: boolean } | null>(null);
+
+  const persistedAttemptIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (test) {
-      setAnswers(new Array(test.testQuestions.length).fill(null));
-      setTimeLeft(test.time * 60);
+    if (!test) {
+      return;
     }
+
+    setPhase("intro");
+    setCurrentQ(0);
+    setAnswers(new Array(test.testQuestions.length).fill(null));
+    setTimeLeft(test.time * 60);
+    setShowExplanation(null);
+    setStartedAt(null);
+    setReviewMeta(null);
+    persistedAttemptIdRef.current = null;
+    setAttemptHistory(getPracticeAttempts(test.id));
   }, [test]);
 
-  // Timer
   useEffect(() => {
-    if (phase !== "active") return;
-    if (timeLeft <= 0) { setPhase("review"); return; }
-    const interval = setInterval(() => setTimeLeft(t => t - 1), 1000);
-    return () => clearInterval(interval);
+    if (phase !== "active") {
+      return;
+    }
+
+    if (timeLeft <= 0) {
+      setReviewMeta({ completedAt: new Date().toISOString(), timedOut: true });
+      setPhase("review");
+      return;
+    }
+
+    const timerId = window.setTimeout(() => setTimeLeft((current) => current - 1), 1000);
+    return () => window.clearTimeout(timerId);
   }, [phase, timeLeft]);
 
-  const formatTime = (s: number) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m}:${sec.toString().padStart(2, "0")}`;
-  };
+  const questions = test?.testQuestions ?? [];
+  const totalQuestions = questions.length;
+  const totalDurationSeconds = test?.time ? test.time * 60 : 0;
+  const answered = answers.filter((answer) => answer !== null).length;
+  const score = answers.reduce((total, answer, index) => total + (answer === questions[index].correctIndex ? 1 : 0), 0);
+  const percentage = totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0;
+  const durationSeconds = Math.min(totalDurationSeconds, Math.max(totalDurationSeconds - timeLeft, 0));
+  const currentQuestion = questions[currentQ];
+  const timeWarning = timeLeft < 60 && phase === "active";
+  const bestAttempt = test ? getBestPracticeAttempt(test.id) : null;
+  const questionUnlocked = test ? isPreviewTestQuestionUnlocked(test.id, currentQ) : false;
+  const showDetailedFeedback = canViewDetailedAnswerFeedback();
+
+  useEffect(() => {
+    if (!test || phase !== "review" || !reviewMeta || !startedAt) {
+      return;
+    }
+
+    const attemptId = `${test.id}-${reviewMeta.completedAt}`;
+    if (persistedAttemptIdRef.current === attemptId) {
+      return;
+    }
+
+    persistedAttemptIdRef.current = attemptId;
+    savePracticeAttempt({
+      id: attemptId,
+      testId: test.id,
+      score,
+      totalQuestions,
+      percentage,
+      startedAt,
+      completedAt: reviewMeta.completedAt,
+      durationSeconds,
+      timedOut: reviewMeta.timedOut,
+      answers,
+    });
+    setAttemptHistory(getPracticeAttempts(test.id));
+  }, [answers, durationSeconds, percentage, phase, reviewMeta, score, startedAt, test, totalQuestions]);
 
   if (!test) {
     return (
@@ -51,98 +255,237 @@ const PracticeTestView = () => {
     );
   }
 
-  const questions = test.testQuestions;
-  const totalQuestions = questions.length;
-  const score = answers.reduce((acc, a, i) => acc + (a === questions[i].correctIndex ? 1 : 0), 0);
-  const answered = answers.filter(a => a !== null).length;
-  const percentage = Math.round((score / totalQuestions) * 100);
-  const timeWarning = timeLeft < 60 && timeLeft > 0;
-
-  const selectAnswer = (idx: number) => {
-    const newAnswers = [...answers];
-    newAnswers[currentQ] = idx;
-    setAnswers(newAnswers);
+  const resetSession = () => {
+    setCurrentQ(0);
+    setAnswers(new Array(totalQuestions).fill(null));
+    setTimeLeft(totalDurationSeconds);
+    setShowExplanation(null);
+    setStartedAt(null);
+    setReviewMeta(null);
+    persistedAttemptIdRef.current = null;
   };
 
-  const goToQuestion = (i: number) => {
-    setCurrentQ(i);
+  const startTest = () => {
+    if (locked) {
+      return;
+    }
+
+    resetSession();
+    setStartedAt(new Date().toISOString());
+    setPhase("active");
+  };
+
+  const finishTest = (timedOut = false) => {
+    if (locked) {
+      return;
+    }
+
+    setReviewMeta({ completedAt: new Date().toISOString(), timedOut });
+    setPhase("review");
+  };
+
+  const selectAnswer = (answerIndex: number) => {
+    if (!questionUnlocked || locked) {
+      return;
+    }
+
+    const nextAnswers = [...answers];
+    nextAnswers[currentQ] = answerIndex;
+    setAnswers(nextAnswers);
+  };
+
+  const goToQuestion = (index: number) => {
+    setCurrentQ(index);
     setShowExplanation(null);
   };
 
-  // INTRO
   if (phase === "intro") {
     return (
       <div className="min-h-screen bg-background">
         <header className="bg-navy border-b border-navy-light/30 sticky top-0 z-50">
           <div className="container mx-auto px-4 flex items-center h-16">
             <Link to="/dashboard" className="flex items-center gap-2">
-              <Shield className="h-7 w-7 text-accent" />
-              <span className="font-heading text-lg font-bold text-primary-foreground">AptitudeForge</span>
+              <BrandLockup size="sm" subtitle="Practice Tests" />
             </Link>
           </div>
         </header>
-        <div className="container mx-auto px-4 py-12 max-w-lg">
+
+        <div className="container mx-auto max-w-6xl px-4 py-10">
           <Link to="/dashboard" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-8">
-            <ArrowLeft className="h-4 w-4" /> Back to Dashboard
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
           </Link>
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-2xl p-8 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-navy flex items-center justify-center mx-auto mb-5">
-              <test.icon className="h-8 w-8 text-accent" />
-            </div>
-            <h1 className="font-heading font-bold text-2xl text-foreground mb-2">{test.title}</h1>
-            <p className="text-muted-foreground mb-6">{test.description}</p>
-            <div className="flex justify-center gap-6 text-sm text-muted-foreground mb-8">
-              <span className="flex items-center gap-1"><Timer className="h-4 w-4" />{test.time} minutes</span>
-              <span>{totalQuestions} questions</span>
-            </div>
-            <div className="bg-muted rounded-xl p-4 mb-6 text-left">
-              <p className="text-sm font-semibold text-foreground mb-2">Instructions</p>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• This test is timed — the clock starts when you click "Begin"</li>
-                <li>• You can navigate between questions freely</li>
-                <li>• Submit when you're ready or when time runs out</li>
-                <li>• Scores and explanations are shown after submission</li>
-              </ul>
-            </div>
-            <Button variant="hero" size="xl" className="w-full" onClick={() => setPhase("active")}>
-              Begin Test <ChevronRight className="h-5 w-5 ml-1" />
-            </Button>
-          </motion.div>
+
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_380px]">
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-3xl border border-border/70 p-8 relative overflow-hidden">
+              {locked && (
+                <LockedMask
+                  title="Locked timed test"
+                  body="This screen stays identical to the real product, but the test remains blurred and unavailable until full access is unlocked."
+                />
+              )}
+
+              <div className={locked ? "blur-[4px] select-none" : ""}>
+                <div className="flex flex-wrap items-start justify-between gap-4 mb-8">
+                  <div>
+                    <div className="w-16 h-16 rounded-2xl bg-navy flex items-center justify-center mb-5">
+                      <test.icon className="h-8 w-8 text-accent" />
+                    </div>
+                    <p className="text-sm font-semibold tracking-[0.24em] uppercase text-accent mb-2">{test.category}</p>
+                    <h1 className="font-heading font-bold text-3xl text-foreground mb-3">{test.title}</h1>
+                    <p className="text-muted-foreground max-w-2xl leading-relaxed">{test.description}</p>
+                  </div>
+
+                  <div className="rounded-2xl bg-muted/70 px-4 py-3 min-w-[220px]">
+                    <p className="text-xs font-semibold tracking-[0.24em] uppercase text-muted-foreground mb-2">Session format</p>
+                    <div className="space-y-2 text-sm text-foreground">
+                      <div className="flex items-center gap-2"><Timer className="h-4 w-4 text-accent" /> {test.time} minute time limit</div>
+                      <div className="flex items-center gap-2"><Target className="h-4 w-4 text-accent" /> {totalQuestions} scored questions</div>
+                      <div className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-accent" /> Auto-submit when time expires</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-3 mb-8">
+                  <div className="rounded-2xl bg-card border border-border/60 p-4">
+                    <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground mb-2">Timed format</p>
+                    <p className="text-sm text-foreground leading-relaxed">Practice tests now mirror exam pressure. The timer starts only when you launch the attempt.</p>
+                  </div>
+                  <div className="rounded-2xl bg-card border border-border/60 p-4">
+                    <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground mb-2">Navigation</p>
+                    <p className="text-sm text-foreground leading-relaxed">Move freely between questions using the progress rail while staying centered on the current question.</p>
+                  </div>
+                  <div className="rounded-2xl bg-card border border-border/60 p-4">
+                    <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground mb-2">Review</p>
+                    <p className="text-sm text-foreground leading-relaxed">Scores, answer explanations, and past attempts are available after every completed run.</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button variant="hero" size="xl" className="sm:min-w-[240px]" onClick={startTest} disabled={locked}>
+                    <Play className="h-5 w-5 mr-2" />
+                    Start Fresh Attempt
+                  </Button>
+                  <div className="rounded-xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
+                    Use this screen to review previous scores before launching a new timed attempt.
+                    {!showDetailedFeedback && " Free preview attempts hide correct answers and full answer review."}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.aside initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="space-y-4">
+              <div className="glass-card rounded-3xl border border-border/70 p-6">
+                <p className="text-xs font-semibold tracking-[0.24em] uppercase text-muted-foreground mb-3">Past attempts</p>
+                {attemptHistory.length === 0 ? (
+                  <div className="rounded-2xl bg-muted/70 p-5 text-sm text-muted-foreground leading-relaxed">
+                    No completed attempts yet. Your first result will appear here after you finish the test.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {attemptHistory.slice(0, 4).map((attempt, index) => (
+                      <div key={attempt.id} className="rounded-2xl bg-card border border-border/60 p-4">
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">Attempt {attemptHistory.length - index}</p>
+                            <p className="text-xs text-muted-foreground">{formatAttemptDate(attempt.completedAt)}</p>
+                          </div>
+                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${attempt.percentage >= 70 ? "bg-green-500/10 text-green-600" : "bg-accent/10 text-accent"}`}>
+                            {attempt.percentage}%
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                          <span>{attempt.score}/{attempt.totalQuestions} correct</span>
+                          <span>{formatDuration(attempt.durationSeconds)}</span>
+                          <span>{attempt.timedOut ? "Timed out" : "Submitted"}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="glass-card rounded-3xl border border-border/70 p-6">
+                <p className="text-xs font-semibold tracking-[0.24em] uppercase text-muted-foreground mb-3">Best result</p>
+                {bestAttempt ? (
+                  <div className="rounded-2xl bg-navy px-5 py-4 text-primary-foreground">
+                    <p className="text-sm text-primary-foreground/60 mb-1">Best completed score</p>
+                    <p className="text-3xl font-heading font-bold mb-2">{bestAttempt.percentage}%</p>
+                    <p className="text-sm text-primary-foreground/70">
+                      {bestAttempt.score}/{bestAttempt.totalQuestions} correct in {formatDuration(bestAttempt.durationSeconds)}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl bg-muted/70 p-5 text-sm text-muted-foreground">
+                    Best-score tracking will appear after your first completed attempt.
+                  </div>
+                )}
+              </div>
+            </motion.aside>
+          </div>
         </div>
       </div>
     );
   }
 
-  // REVIEW
   if (phase === "review") {
     return (
       <div className="min-h-screen bg-background">
         <header className="bg-navy border-b border-navy-light/30 sticky top-0 z-50">
           <div className="container mx-auto px-4 flex items-center h-16">
             <Link to="/dashboard" className="flex items-center gap-2">
-              <Shield className="h-7 w-7 text-accent" />
-              <span className="font-heading text-lg font-bold text-primary-foreground">AptitudeForge</span>
+              <BrandLockup size="sm" subtitle="Practice Tests" />
             </Link>
           </div>
         </header>
-        <div className="container mx-auto px-4 py-8 max-w-3xl">
-          {/* Score summary */}
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-2xl p-8 text-center mb-8">
-            <div className="w-16 h-16 rounded-2xl gradient-gold flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="h-8 w-8 text-gold-foreground" />
+
+        <div className="container mx-auto max-w-5xl px-4 py-8">
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-3xl border border-border/70 p-8 text-center mb-8">
+            <div className={`w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center ${percentage >= 70 ? "gradient-gold" : "gradient-accent"}`}>
+              {percentage >= 70 ? (
+                <Trophy className="h-8 w-8 text-gold-foreground" />
+              ) : (
+                <CheckCircle className="h-8 w-8 text-accent-foreground" />
+              )}
             </div>
-            <h2 className="font-heading font-bold text-2xl text-foreground mb-1">Test Complete!</h2>
-            <p className="text-5xl font-heading font-bold text-foreground my-4">{score}/{totalQuestions}</p>
-            <p className="text-lg text-muted-foreground mb-4">{percentage}% correct</p>
-            <div className="w-full max-w-xs mx-auto bg-muted rounded-full h-4 mb-6 overflow-hidden">
+            <h2 className="font-heading font-bold text-3xl text-foreground mb-2">
+              {reviewMeta?.timedOut ? "Time expired" : "Attempt complete"}
+            </h2>
+            <p className="text-muted-foreground mb-5">
+              {reviewMeta?.timedOut
+                ? "The test auto-submitted when the timer reached zero. Your recorded answers are saved below."
+                : "Review your score, inspect each answer, and decide where to focus before the next attempt."}
+            </p>
+
+            <div className="grid gap-4 sm:grid-cols-3 mb-6">
+              <div className="rounded-2xl bg-card border border-border/60 p-4">
+                <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground mb-2">Score</p>
+                <p className="text-3xl font-heading font-bold text-foreground">{score}/{totalQuestions}</p>
+              </div>
+              <div className="rounded-2xl bg-card border border-border/60 p-4">
+                <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground mb-2">Accuracy</p>
+                <p className="text-3xl font-heading font-bold text-foreground">{percentage}%</p>
+              </div>
+              <div className="rounded-2xl bg-card border border-border/60 p-4">
+                <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground mb-2">Time used</p>
+                <p className="text-3xl font-heading font-bold text-foreground">{formatDuration(durationSeconds)}</p>
+              </div>
+            </div>
+
+            <div className="w-full max-w-sm mx-auto rounded-full bg-muted h-4 overflow-hidden mb-6">
               <div
                 className={`h-full rounded-full transition-all duration-700 ${percentage >= 70 ? "gradient-gold" : "gradient-accent"}`}
                 style={{ width: `${percentage}%` }}
               />
             </div>
-            <div className="flex gap-3 justify-center">
-              <Button variant="outline" onClick={() => { setPhase("intro"); setCurrentQ(0); setAnswers(new Array(totalQuestions).fill(null)); setTimeLeft(test.time * 60); setShowExplanation(null); }}>
-                <RotateCcw className="h-4 w-4 mr-1" /> Retake
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button variant="outline" onClick={startTest}>
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Attempt Again
+              </Button>
+              <Button variant="hero" onClick={() => { resetSession(); setPhase("intro"); }}>
+                Review Past Attempts
               </Button>
               <Link to="/dashboard">
                 <Button>Back to Dashboard</Button>
@@ -150,39 +493,65 @@ const PracticeTestView = () => {
             </div>
           </motion.div>
 
-          {/* Question review */}
-          <h3 className="font-heading font-semibold text-lg text-foreground mb-4">Review Answers</h3>
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <h3 className="font-heading font-semibold text-lg text-foreground">Answer review</h3>
+            <p className="text-sm text-muted-foreground">{attemptHistory.length} saved attempt{attemptHistory.length === 1 ? "" : "s"} for this test</p>
+          </div>
+
           <div className="space-y-4">
-            {questions.map((q, i) => {
-              const userAnswer = answers[i];
-              const isCorrect = userAnswer === q.correctIndex;
+            {questions.map((question, index) => {
+              const userAnswer = answers[index];
+              const isCorrect = userAnswer === question.correctIndex;
+              const reviewQuestionUnlocked = isPreviewTestQuestionUnlocked(test.id, index);
+
               return (
-                <div key={i} className="glass-card rounded-xl p-5">
-                  <div className="flex items-start gap-3 mb-3">
-                    {isCorrect ? (
-                      <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    ) : (
-                      <XCircle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
-                    )}
-                    <div>
-                      <p className="font-medium text-foreground text-sm">{i + 1}. {q.question}</p>
-                      {userAnswer !== null && userAnswer !== q.correctIndex && (
-                        <p className="text-sm text-destructive mt-1">Your answer: {q.options[userAnswer]}</p>
-                      )}
-                      <p className="text-sm text-green-600 mt-0.5">Correct: {q.options[q.correctIndex]}</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setShowExplanation(showExplanation === i ? null : i)}
-                    className="text-xs text-accent font-medium hover:underline"
-                  >
-                    {showExplanation === i ? "Hide" : "Show"} explanation
-                  </button>
-                  {showExplanation === i && (
-                    <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm text-muted-foreground mt-2 bg-muted rounded-lg p-3">
-                      {q.explanation}
-                    </motion.p>
+                <div key={index} className="glass-card rounded-2xl border border-border/60 p-5 relative overflow-hidden">
+                  {!reviewQuestionUnlocked && (
+                    <LockedMask
+                      title="Preview limit"
+                      body="Only the first available free-plan questions are open. The rest of the answer review stays masked until full access is unlocked."
+                    />
                   )}
+                  <div className={!reviewQuestionUnlocked ? "blur-[4px] select-none" : ""}>
+                    <div className="flex items-start gap-3 mb-3">
+                      {isCorrect ? (
+                        <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground text-sm mb-1">{index + 1}. {question.question}</p>
+                        {userAnswer !== null ? (
+                          <p className="text-sm text-muted-foreground">Your answer: {question.options[userAnswer]}</p>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No answer submitted.</p>
+                        )}
+                        {showDetailedFeedback ? (
+                          <p className="text-sm text-green-600 mt-1">Correct answer: {question.options[question.correctIndex]}</p>
+                        ) : (
+                          <p className="text-sm text-muted-foreground mt-1">Correct answer available with premium access.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setShowExplanation(showExplanation === index ? null : index)}
+                      className="text-xs font-medium text-accent hover:underline"
+                      disabled={!reviewQuestionUnlocked || !showDetailedFeedback}
+                    >
+                      {showDetailedFeedback ? (showExplanation === index ? "Hide explanation" : "Show explanation") : "Premium explanation"}
+                    </button>
+                    {showExplanation === index && showDetailedFeedback && (
+                      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm text-muted-foreground mt-3 bg-muted rounded-xl p-4">
+                        {question.explanation}
+                      </motion.p>
+                    )}
+                    {!showDetailedFeedback && reviewQuestionUnlocked && (
+                      <div className="text-sm text-muted-foreground mt-3 bg-muted rounded-xl p-4">
+                        Detailed explanations and the full answer breakdown unlock with premium access.
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -192,124 +561,130 @@ const PracticeTestView = () => {
     );
   }
 
-  // ACTIVE TEST
-  const currentQuestion = questions[currentQ];
-
   return (
     <div className="min-h-screen bg-background">
-      {/* Test header with timer */}
       <header className="bg-navy border-b border-navy-light/30 sticky top-0 z-50">
-        <div className="container mx-auto px-4 flex items-center justify-between h-14">
-          <span className="font-heading text-sm font-semibold text-primary-foreground">{test.title}</span>
-          <div className="flex items-center gap-4">
-            <span className={`flex items-center gap-1.5 font-mono text-sm font-bold ${timeWarning ? "text-destructive animate-pulse" : "text-primary-foreground"}`}>
+        <div className="container mx-auto px-4 flex items-center justify-between h-16 gap-4">
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase tracking-[0.24em] text-primary-foreground/50 mb-1">Timed practice test</p>
+            <p className="font-heading text-sm sm:text-base font-semibold text-primary-foreground truncate">{test.title}</p>
+          </div>
+          <div className="flex items-center gap-3 sm:gap-4">
+            <span className={`hidden sm:flex items-center gap-1.5 font-mono text-sm font-bold ${timeWarning ? "text-destructive animate-pulse" : "text-primary-foreground"}`}>
               {timeWarning && <AlertTriangle className="h-4 w-4" />}
               <Timer className="h-4 w-4" />
-              {formatTime(timeLeft)}
+              {formatClock(timeLeft)}
             </span>
-            <Button
-              variant="hero"
-              size="sm"
-              onClick={() => setPhase("review")}
-            >
+            <Button variant="hero" size="sm" onClick={() => finishTest(false)}>
               Submit ({answered}/{totalQuestions})
             </Button>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-6 max-w-3xl">
-        <div className="flex gap-6">
-          {/* Question nav - desktop */}
-          <div className="hidden lg:block w-48 flex-shrink-0">
-            <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Questions</p>
-            <div className="grid grid-cols-5 gap-2">
-              {questions.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => goToQuestion(i)}
-                  className={`w-8 h-8 rounded-lg text-xs font-semibold transition-all ${
-                    i === currentQ
-                      ? "gradient-accent text-accent-foreground"
-                      : answers[i] !== null
-                      ? "bg-navy text-primary-foreground"
-                      : "bg-muted text-muted-foreground hover:bg-muted-foreground/20"
-                  }`}
-                >
-                  {i + 1}
-                </button>
-              ))}
-            </div>
-          </div>
+      <div className="container mx-auto max-w-6xl px-4 py-6 lg:py-8">
+        <div className="xl:hidden mb-5">
+          <ProgressPanel
+            answers={answers}
+            currentQ={currentQ}
+            totalQuestions={totalQuestions}
+            timeLeft={timeLeft}
+            onGoToQuestion={goToQuestion}
+            compact
+          />
+        </div>
 
-          {/* Main question area */}
-          <div className="flex-1 min-w-0">
-            {/* Mobile question nav */}
-            <div className="lg:hidden flex gap-1.5 overflow-x-auto pb-3 mb-4 scrollbar-hide">
-              {questions.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => goToQuestion(i)}
-                  className={`w-8 h-8 rounded-lg text-xs font-semibold flex-shrink-0 transition-all ${
-                    i === currentQ
-                      ? "gradient-accent text-accent-foreground"
-                      : answers[i] !== null
-                      ? "bg-navy text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {i + 1}
-                </button>
-              ))}
-            </div>
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px] items-start">
+          <div className="min-w-0">
+            <motion.div
+              key={currentQ}
+              initial={{ opacity: 0, x: 14 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.18 }}
+              className="mx-auto w-full max-w-3xl glass-card rounded-3xl border border-border/70 p-6 sm:p-8 shadow-xl relative overflow-hidden"
+            >
+              {(!questionUnlocked || locked) && (
+                <LockedMask
+                  title={locked ? "Locked timed test" : "Preview question limit reached"}
+                  body={locked
+                    ? "This timed test remains visible in the real layout, but its questions stay locked until full access is unlocked."
+                    : "The free plan only unlocks the first few questions. The remaining questions stay visible in the real test layout but require full access."}
+                />
+              )}
 
-            <motion.div key={currentQ} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.15 }}>
-              <p className="text-sm text-muted-foreground mb-2">Question {currentQ + 1} of {totalQuestions}</p>
-              <h2 className="font-semibold text-lg text-foreground mb-6">{currentQuestion.question}</h2>
+              <div className={!questionUnlocked || locked ? "blur-[4px] select-none" : ""}>
+                <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+                  <div>
+                    <p className="text-xs font-semibold tracking-[0.24em] uppercase text-muted-foreground mb-2">Question {currentQ + 1} of {totalQuestions}</p>
+                    <h2 className="font-heading text-2xl font-semibold text-foreground leading-tight">{currentQuestion.question}</h2>
+                  </div>
+                  <div className="rounded-xl bg-muted/80 px-3 py-2 text-sm text-muted-foreground">
+                    {answered} answered
+                  </div>
+                </div>
 
-              <div className="space-y-3">
-                {currentQuestion.options.map((opt, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => selectAnswer(idx)}
-                    className={`w-full text-left rounded-xl p-4 flex items-center gap-3 transition-all duration-200 ${
-                      answers[currentQ] === idx
-                        ? "border-2 border-accent bg-accent/5 shadow-sm"
-                        : "glass-card hover:border-accent/30"
-                    }`}
+                <div className="w-full rounded-full bg-muted h-2 overflow-hidden mb-8">
+                  <div
+                    className="h-full gradient-accent rounded-full transition-all duration-300"
+                    style={{ width: `${((currentQ + 1) / totalQuestions) * 100}%` }}
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  {currentQuestion.options.map((option, index) => (
+                    <button
+                      key={index}
+                      onClick={() => selectAnswer(index)}
+                      disabled={!questionUnlocked || locked}
+                      className={`w-full text-left rounded-2xl p-4 flex items-center gap-3 transition-all duration-200 ${
+                        answers[currentQ] === index
+                          ? "border-2 border-accent bg-accent/5 shadow-sm"
+                          : "border border-border/60 bg-card hover:border-accent/40 hover:bg-card/95"
+                      }`}
+                    >
+                      <span className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-semibold flex-shrink-0 ${
+                        answers[currentQ] === index ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"
+                      }`}>
+                        {String.fromCharCode(65 + index)}
+                      </span>
+                      <span className="text-foreground font-medium">{option}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between gap-3 mt-8">
+                  <Button variant="outline" disabled={currentQ === 0} onClick={() => goToQuestion(currentQ - 1)}>
+                    Previous
+                  </Button>
+                  <Button
+                    variant="default"
+                    disabled={locked}
+                    onClick={() => {
+                      if (currentQ < totalQuestions - 1) {
+                        goToQuestion(currentQ + 1);
+                        return;
+                      }
+
+                      finishTest(false);
+                    }}
                   >
-                    <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold flex-shrink-0 ${
-                      answers[currentQ] === idx ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"
-                    }`}>
-                      {String.fromCharCode(65 + idx)}
-                    </span>
-                    <span className="text-foreground font-medium">{opt}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Navigation */}
-              <div className="flex justify-between mt-8">
-                <Button
-                  variant="outline"
-                  disabled={currentQ === 0}
-                  onClick={() => goToQuestion(currentQ - 1)}
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="default"
-                  onClick={() => {
-                    if (currentQ < totalQuestions - 1) goToQuestion(currentQ + 1);
-                    else setPhase("review");
-                  }}
-                >
-                  {currentQ < totalQuestions - 1 ? "Next" : "Review & Submit"}
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
+                    {currentQ < totalQuestions - 1 ? "Next Question" : "Review and Submit"}
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
               </div>
             </motion.div>
           </div>
+
+          <aside className="hidden xl:block xl:sticky xl:top-24">
+            <ProgressPanel
+              answers={answers}
+              currentQ={currentQ}
+              totalQuestions={totalQuestions}
+              timeLeft={timeLeft}
+              onGoToQuestion={goToQuestion}
+            />
+          </aside>
         </div>
       </div>
     </div>

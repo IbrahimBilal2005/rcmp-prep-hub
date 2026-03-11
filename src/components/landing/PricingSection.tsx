@@ -1,67 +1,115 @@
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import { ArrowRight, Check, Crown, Shield, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Check, ArrowRight } from "lucide-react";
-
-const included = [
-  "All 7 training modules",
-  "Video lessons & strategies",
-  "Unlimited practice quizzes",
-  "Full RCMP simulation exams",
-  "Timed test conditions",
-  "Answer explanations",
-  "Work style preparation",
-  "6 months access",
-];
+import { billingPlans } from "@/data/billingPlans";
 
 const PricingSection = () => {
   return (
-    <section id="pricing" className="py-24 bg-background">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-16">
-          <span className="text-accent text-sm font-semibold tracking-wide uppercase">Pricing</span>
-          <h2 className="text-3xl sm:text-4xl font-heading font-bold text-foreground mt-3 mb-4">
-            One Price. Full Access.
-          </h2>
-          <p className="text-muted-foreground max-w-lg mx-auto">
-            No subscriptions or hidden fees. One purchase gives you everything you need.
+    <section id="pricing" className="section-wash scroll-mt-24 bg-transparent py-10 sm:scroll-mt-28 sm:py-12">
+      <div className="app-shell">
+        <div className="mb-10 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)] lg:items-end">
+          <div>
+            <span className="eyebrow">Plans</span>
+            <h2 className="section-heading mt-5">
+              One signup flow, two levels of access.
+            </h2>
+          </div>
+          <p className="section-copy lg:ml-auto lg:max-w-sm">
+            Both paths start with the same signup flow. After account creation, users choose either the Free Plan or Premium Access and enter the matching dashboard.
           </p>
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
-          className="max-w-md mx-auto"
-        >
-          <div className="rounded-2xl border-2 border-accent/30 bg-card p-8 shadow-xl relative overflow-hidden">
-            {/* Accent bar */}
-            <div className="absolute top-0 left-0 right-0 h-1 gradient-accent" />
-
-            <div className="text-center mb-8">
-              <p className="text-sm font-semibold text-accent uppercase tracking-wide mb-2">Complete Platform</p>
-              <div className="flex items-baseline justify-center gap-1">
-                <span className="text-5xl font-heading font-bold text-foreground">$59</span>
-                <span className="text-muted-foreground text-lg">CAD</span>
-              </div>
-              <p className="text-sm text-muted-foreground mt-2">6 months of full access</p>
-            </div>
-
-            <div className="space-y-3 mb-8">
-              {included.map((item) => (
-                <div key={item} className="flex items-center gap-3">
-                  <Check className="h-4 w-4 text-gold flex-shrink-0" />
-                  <span className="text-sm text-foreground">{item}</span>
-                </div>
-              ))}
-            </div>
-
-            <Button variant="hero" size="xl" className="w-full">
-              Get Started Now
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
+        <div className="section-card">
+          <div className="mb-10 flex max-w-4xl flex-wrap items-center gap-3">
+            <span className="glass-card rounded-full px-4 py-2 text-sm font-medium text-foreground">Clean onboarding</span>
+            <span className="glass-card rounded-full px-4 py-2 text-sm font-medium text-foreground">Real dashboard access</span>
+            <span className="glass-card rounded-full px-4 py-2 text-sm font-medium text-foreground">Upgrade only when ready</span>
           </div>
-        </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="grid gap-6 xl:grid-cols-[0.94fr_1.06fr]"
+          >
+            {billingPlans.map((plan) => {
+              const isPremium = plan.tier === "premium";
+
+              return (
+                <div
+                  key={plan.id}
+                  className={`relative overflow-hidden rounded-[2.15rem] p-7 sm:p-8 ${
+                    isPremium
+                      ? "border border-navy-light/25 bg-[linear-gradient(180deg,hsl(202_38%_15%)_0%,hsl(202_44%_11%)_100%)] text-primary-foreground shadow-[0_32px_90px_-42px_rgba(8,18,24,0.72)]"
+                      : "glass-card border border-border/70"
+                  }`}
+                >
+                  {isPremium && (
+                    <>
+                      <div className="absolute left-0 right-0 top-0 h-1 gradient-accent" />
+                      <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-accent/10 blur-3xl" />
+                    </>
+                  )}
+
+                  <div className="mb-6 flex items-start justify-between gap-4">
+                    <div>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-accent">{plan.accessLabel}</p>
+                      <h3 className={`mb-2 font-heading text-[2.4rem] font-semibold leading-none ${isPremium ? "text-primary-foreground" : "text-foreground"}`}>
+                        {plan.name}
+                      </h3>
+                      <div className="mb-3 flex items-end gap-2">
+                        <span className={`font-heading text-6xl font-semibold leading-none ${isPremium ? "text-primary-foreground" : "text-foreground"}`}>
+                          {plan.priceLabel}
+                        </span>
+                        <span className={`pb-1 text-lg ${isPremium ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                          {plan.currency}
+                        </span>
+                      </div>
+                      <p className={`text-sm leading-relaxed ${isPremium ? "text-primary-foreground/72" : "text-muted-foreground"}`}>
+                        {plan.summary}
+                      </p>
+                    </div>
+                    {isPremium ? (
+                      <Crown className="h-5 w-5 flex-shrink-0 text-accent" />
+                    ) : (
+                      <Sparkles className="h-5 w-5 flex-shrink-0 text-accent" />
+                    )}
+                  </div>
+
+                  {isPremium && (
+                    <div className="mb-6 flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-primary-foreground/74">
+                      <Shield className="h-4 w-4 text-accent" />
+                      Designed for the full prep journey
+                    </div>
+                  )}
+
+                  <div className="mb-8 grid gap-3">
+                    {plan.includes.map((item) => (
+                      <div
+                        key={item}
+                        className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${
+                          isPremium ? "border border-white/10 bg-white/5" : "bg-white/65"
+                        }`}
+                      >
+                        <Check className={`h-4 w-4 flex-shrink-0 ${isPremium ? "text-accent" : "text-accent"}`} />
+                        <span className={`text-sm ${isPremium ? "text-primary-foreground" : "text-foreground"}`}>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <Link to="/signup?mode=signup">
+                    <Button variant={isPremium ? "hero" : "outline"} size="xl" className="w-full">
+                      Create Account To Choose
+                      <ArrowRight className="h-5 w-5" />
+                    </Button>
+                  </Link>
+                </div>
+              );
+            })}
+          </motion.div>
+        </div>
       </div>
     </section>
   );

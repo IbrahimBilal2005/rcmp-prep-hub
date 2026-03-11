@@ -1,86 +1,136 @@
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
+import { ArrowRight, BookOpen, ShieldCheck, Timer, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, CheckCircle } from "lucide-react";
+import logoMark from "@/assets/logo-mark.png";
 
-const highlights = [
-  "7 comprehensive training modules",
-  "Full RCMP simulation exams",
-  "Timed practice with explanations",
+const heroStats = [
+  { label: "Focused modules", value: "7", icon: BookOpen },
+  { label: "Timed simulations", value: "Real exam flow", icon: Timer },
+  { label: "Progress tracking", value: "Saved history", icon: Trophy },
 ];
 
 const HeroSection = () => {
   return (
-    <section className="relative min-h-[90vh] gradient-hero flex items-center overflow-hidden">
-      {/* Decorative elements */}
+    <section className="section-wash gradient-hero relative overflow-hidden pt-28 sm:pt-32 lg:pt-36">
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-20 right-20 w-96 h-96 rounded-full bg-accent/5 blur-3xl" />
-        <div className="absolute bottom-20 left-10 w-72 h-72 rounded-full bg-gold/5 blur-3xl" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(27,53,64,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(27,53,64,0.04)_1px,transparent_1px)] [background-size:110px_110px]" />
+        <div className="absolute inset-x-0 top-0 h-[640px] bg-[linear-gradient(180deg,rgba(255,255,255,0.82),rgba(252,249,244,0.4)_45%,rgba(252,249,244,0)_100%)]" />
+        <div className="absolute -left-20 top-24 h-72 w-72 rounded-full bg-accent/10 blur-3xl" />
+        <div className="absolute right-0 top-14 h-72 w-72 rounded-full bg-accent/10 blur-3xl" />
+        <div className="absolute -right-20 top-24 hidden w-[420px] opacity-[0.04] lg:block">
+          <img src={logoMark} alt="" aria-hidden="true" className="h-auto w-full" />
+        </div>
+        <div className="absolute bottom-0 left-[-4rem] hidden w-[300px] opacity-[0.03] lg:block">
+          <img src={logoMark} alt="" aria-hidden="true" className="h-auto w-full" />
+        </div>
       </div>
 
-      <div className="container mx-auto px-4 pt-24 pb-16 relative z-10">
-        <div className="max-w-3xl">
+      <div className="app-shell relative z-10 pb-12 sm:pb-16 lg:pb-24">
+        <div className="grid items-end gap-10 xl:grid-cols-[minmax(0,1.15fr)_minmax(22rem,30rem)] xl:gap-14">
+          <div className="max-w-4xl">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+              <span className="eyebrow mb-8">
+                <ShieldCheck className="h-3.5 w-3.5 text-accent" />
+                RCMP aptitude test prep
+              </span>
+            </motion.div>
+
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="flex max-w-5xl flex-col gap-2 pb-3 font-semibold leading-[1] tracking-[-0.03em] text-foreground"
+            >
+              <span className="block whitespace-nowrap text-[3.35rem] sm:text-[4.45rem] lg:text-[5.45rem]">Prepare smarter.</span>
+              <span className="block whitespace-nowrap text-[3.6rem] text-gradient sm:text-[4.9rem] lg:text-[5.9rem]">Perform better.</span>
+            </motion.h1>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="mt-8 max-w-xl"
+            >
+              <p className="section-copy text-[1.04rem]">
+                A focused RCMP-style study environment with guided modules, timed practice, and review tools designed to keep your next move clear without clutter or noise.
+              </p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              className="mt-10 flex flex-col gap-4 sm:flex-row"
+            >
+              <Link to="/signup?mode=signup">
+                <Button variant="hero" size="xl">
+                  Create Account
+                  <ArrowRight className="h-5 w-5" />
+                </Button>
+              </Link>
+              <a href="#modules">
+                <Button variant="heroOutline" size="xl">
+                  Explore Modules
+                </Button>
+              </a>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="mt-12 grid gap-4 sm:grid-cols-3"
+            >
+              {heroStats.map((stat) => (
+                <div key={stat.label} className="glass-card rounded-[1.8rem] p-5">
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/65 shadow-inner shadow-white/60">
+                    <stat.icon className="h-5 w-5 text-accent" />
+                  </div>
+                  <p className="font-heading text-[1.8rem] font-semibold leading-none text-foreground">{stat.value}</p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{stat.label}</p>
+                </div>
+              ))}
+            </motion.div>
+          </div>
+
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 28 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 0.7, delay: 0.2 }}
+            className="relative xl:-translate-y-10"
           >
-            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/10 border border-accent/20 text-accent text-sm font-medium mb-6">
-              🎯 RCMP Aptitude Test Prep
-            </span>
-          </motion.div>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-4xl sm:text-5xl lg:text-6xl font-heading font-bold text-primary-foreground leading-tight mb-6"
-          >
-            Master the RCMP
-            <br />
-            <span className="text-gradient">Aptitude Test</span>
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-lg text-primary-foreground/60 mb-8 max-w-xl leading-relaxed"
-          >
-            Structured training modules, practice exams, and expert strategies 
-            designed to help you succeed in the RCMP aptitude assessment.
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="flex flex-col sm:flex-row gap-4 mb-10"
-          >
-            <a href="#pricing">
-              <Button variant="hero" size="xl">
-                Start Training — $59 CAD
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </a>
-            <a href="#modules">
-              <Button variant="heroOutline" size="xl">
-                View Modules
-              </Button>
-            </a>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.5 }}
-            className="space-y-3"
-          >
-            {highlights.map((item) => (
-              <div key={item} className="flex items-center gap-3">
-                <CheckCircle className="h-4 w-4 text-gold flex-shrink-0" />
-                <span className="text-sm text-primary-foreground/50">{item}</span>
+            <div className="panel mesh-panel rounded-[2.4rem] p-6 sm:p-7">
+              <div className="rounded-[1.9rem] border border-white/70 bg-white/55 p-5 backdrop-blur-xl">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">Study cadence</span>
+                  <span className="rounded-full bg-accent/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-accent">Premium flow</span>
+                </div>
+                <div className="mt-7 space-y-5">
+                  <div className="rounded-[1.6rem] bg-navy px-5 py-5 text-primary-foreground shadow-[0_18px_50px_-32px_rgba(4,16,24,0.72)]">
+                    <p className="text-[11px] uppercase tracking-[0.28em] text-primary-foreground/60">Current focus</p>
+                    <p className="mt-3 font-heading text-4xl font-semibold">Timed simulation</p>
+                    <div className="mt-6 h-2 overflow-hidden rounded-full bg-white/10">
+                      <div className="h-full w-[68%] rounded-full gradient-gold" />
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-sm text-primary-foreground/68">
+                      <span>17 questions completed</span>
+                      <span>68% through</span>
+                    </div>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="rounded-[1.5rem] border border-border/60 bg-white/70 p-4">
+                      <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Average pace</p>
+                      <p className="mt-3 font-heading text-3xl font-semibold text-foreground">1.8m</p>
+                    </div>
+                    <div className="rounded-[1.5rem] border border-border/60 bg-white/70 p-4">
+                      <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Best streak</p>
+                      <p className="mt-3 font-heading text-3xl font-semibold text-foreground">12</p>
+                    </div>
+                  </div>
+                </div>
               </div>
-            ))}
+            </div>
           </motion.div>
         </div>
       </div>

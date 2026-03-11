@@ -1,73 +1,62 @@
-# Welcome to your Lovable project
+# AptitudeForge Frontend
 
-## Project info
+Frontend prototype for an RCMP aptitude test prep product. This phase focuses on strong UI, realistic test flow, and clean integration seams for Supabase and Stripe.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Run locally
 
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+1. Install dependencies:
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+npm install
 ```
 
-**Edit a file directly in GitHub**
+2. Copy the example environment file and fill values later as needed:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```sh
+Copy-Item .env.example .env
+```
 
-**Use GitHub Codespaces**
+3. Start the app on localhost:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```sh
+npm run dev:localhost
+```
 
-## What technologies are used for this project?
+Default local URL: `http://127.0.0.1:8080`
 
-This project is built with:
+## Current frontend scope
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- Landing page with improved "Path to Success" and pricing sections
+- Dashboard with module and practice test flows
+- Practice tests with:
+  - timed attempts
+  - local attempt history
+  - post-test review and explanations
+  - centered question layout with separate progress rail
+- Module quizzes remain untimed
 
-## How can I deploy this project?
+## Phase 2 integration seams
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+Environment variables are scaffolded in `.env.example`:
 
-## Can I connect a custom domain to my Lovable project?
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `VITE_STRIPE_PUBLISHABLE_KEY`
+- `VITE_STRIPE_PRICE_6_MONTHS`
+- `VITE_USE_MOCK_AUTH`
+- `VITE_USE_MOCK_BILLING`
 
-Yes, you can!
+Supporting frontend files:
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+- `src/lib/platform.ts` for runtime config and readiness flags
+- `src/data/billingPlans.ts` for Stripe-aligned plan metadata
+- `src/lib/practiceTestStorage.ts` for the temporary local attempt store that can later move to Supabase
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## Verification
+
+Use these commands while iterating:
+
+```sh
+npm run lint
+npm run build
+```
