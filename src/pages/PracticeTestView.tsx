@@ -76,7 +76,7 @@ const LockedMask = ({
       <p className="text-sm text-muted-foreground leading-relaxed mb-5">{body}</p>
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
         <a href="/signup?step=plan">
-          <Button variant="hero">Unlock Full Access</Button>
+          <Button variant="locked">Unlock Full Access</Button>
         </a>
         <Link to={`/test/${FREE_PREVIEW_TEST_ID}`}>
           <Button variant="outline">Open Free Sample</Button>
@@ -106,7 +106,7 @@ const ProgressPanel = ({
         </div>
         <div className="rounded-xl bg-navy px-3 py-2 text-primary-foreground">
           <p className="text-[10px] uppercase tracking-[0.24em] text-primary-foreground/60">Time left</p>
-          <p className={`font-mono text-lg font-bold ${timeLeft < 60 ? "text-destructive" : "text-accent"}`}>
+          <p className={`font-mono text-lg font-bold ${timeLeft < 60 ? "text-red-300" : "text-white"}`}>
             {formatClock(timeLeft)}
           </p>
         </div>
@@ -408,15 +408,15 @@ const PracticeTestView = () => {
               <div className="glass-card rounded-3xl border border-border/70 p-6">
                 <p className="text-xs font-semibold tracking-[0.24em] uppercase text-muted-foreground mb-3">Best result</p>
                 {bestAttempt ? (
-                  <div className="rounded-2xl bg-navy px-5 py-4 text-primary-foreground">
-                    <p className="text-sm text-primary-foreground/60 mb-1">Best completed score</p>
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-emerald-900">
+                    <p className="text-sm text-emerald-700 mb-1">Best completed score</p>
                     <p className="text-3xl font-heading font-bold mb-2">{bestAttempt.percentage}%</p>
-                    <p className="text-sm text-primary-foreground/70">
+                    <p className="text-sm text-emerald-800/80">
                       {bestAttempt.score}/{bestAttempt.totalQuestions} correct in {formatDuration(bestAttempt.durationSeconds)}
                     </p>
                   </div>
                 ) : (
-                  <div className="rounded-2xl bg-muted/70 p-5 text-sm text-muted-foreground">
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-800/80">
                     Best-score tracking will appear after your first completed attempt.
                   </div>
                 )}
@@ -570,7 +570,7 @@ const PracticeTestView = () => {
             <p className="font-heading text-sm sm:text-base font-semibold text-primary-foreground truncate">{test.title}</p>
           </div>
           <div className="flex items-center gap-3 sm:gap-4">
-            <span className={`hidden sm:flex items-center gap-1.5 font-mono text-sm font-bold ${timeWarning ? "text-destructive animate-pulse" : "text-primary-foreground"}`}>
+            <span className={`hidden sm:flex items-center gap-1.5 font-mono text-sm font-bold ${timeWarning ? "text-red-300 animate-pulse" : "text-white"}`}>
               {timeWarning && <AlertTriangle className="h-4 w-4" />}
               <Timer className="h-4 w-4" />
               {formatClock(timeLeft)}

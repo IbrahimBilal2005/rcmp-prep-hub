@@ -43,7 +43,7 @@ const LockedMask = ({
       <p className="text-sm text-muted-foreground leading-relaxed mb-5">{body}</p>
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
         <a href="/signup?step=plan">
-          <Button variant="hero">Unlock Full Access</Button>
+          <Button variant="locked">Unlock Full Access</Button>
         </a>
         <Link to={`/module/${FREE_PREVIEW_MODULE_ID}`}>
           <Button variant="outline">Open Available Module</Button>

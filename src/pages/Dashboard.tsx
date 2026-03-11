@@ -339,7 +339,7 @@ const Dashboard = () => {
                             </span>
                           )}
                           {!accessible && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-red-600">
                               <LockKeyhole className="h-3 w-3" /> Locked
                             </span>
                           )}
@@ -384,7 +384,7 @@ const Dashboard = () => {
                         <ArrowRight className="h-5 w-5 text-muted-foreground/50 group-hover:text-accent transition-colors flex-shrink-0 mt-1" />
                       ) : (
                         <a href="/signup?step=plan" className="ml-auto">
-                          <Button variant="outline" size="sm">Unlock</Button>
+                          <Button variant="locked" size="sm">Unlock</Button>
                         </a>
                       )}
                     </motion.div>
@@ -423,7 +423,7 @@ const Dashboard = () => {
                         </div>
                         <div className="flex items-center gap-2">
                           {!accessible && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-red-600">
                               <LockKeyhole className="h-3 w-3" /> Locked
                             </span>
                           )}
@@ -463,7 +463,7 @@ const Dashboard = () => {
                         </Button>
                       ) : (
                         <a href="/signup?step=plan" className="block">
-                          <Button variant="outline" size="sm" className="w-full">
+                          <Button variant="locked" size="sm" className="w-full">
                             Unlock Full Library
                           </Button>
                         </a>
