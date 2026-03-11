@@ -302,10 +302,15 @@ const PracticeTestView = () => {
   if (phase === "intro") {
     return (
       <div className="min-h-screen bg-background">
-        <header className="bg-navy border-b border-navy-light/30 sticky top-0 z-50">
+        <header className="sticky top-0 z-50 border-b border-border/70 bg-background/88 backdrop-blur-xl">
           <div className="container mx-auto px-4 flex items-center h-16">
             <Link to="/dashboard" className="flex items-center gap-2">
-              <BrandLockup size="sm" subtitle="Practice Tests" />
+              <BrandLockup
+                size="sm"
+                subtitle="Practice Tests"
+                textClassName="text-foreground"
+                subtitleClassName="text-muted-foreground"
+              />
             </Link>
           </div>
         </header>
@@ -358,6 +363,32 @@ const PracticeTestView = () => {
                   <div className="rounded-2xl bg-card border border-border/60 p-4">
                     <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground mb-2">Review</p>
                     <p className="text-sm text-foreground leading-relaxed">Scores, answer explanations, and past attempts are available after every completed run.</p>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-border/70 bg-card/80 p-5 mb-8">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-accent mb-2">What this page includes</p>
+                      <p className="font-heading text-xl font-semibold text-foreground">A full test workspace, not just a launch button</p>
+                    </div>
+                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                      Dashboard resource preview
+                    </span>
+                  </div>
+                  <div className="mt-5 grid gap-3 md:grid-cols-3">
+                    <div className="rounded-2xl bg-muted/55 px-4 py-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">During the test</p>
+                      <p className="mt-2 text-sm leading-relaxed text-foreground">Live timer, progress rail, and question-to-question navigation in one view.</p>
+                    </div>
+                    <div className="rounded-2xl bg-muted/55 px-4 py-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">After submission</p>
+                      <p className="mt-2 text-sm leading-relaxed text-foreground">Saved attempts, best-score tracking, and a structured review loop.</p>
+                    </div>
+                    <div className="rounded-2xl bg-muted/55 px-4 py-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Why it matters</p>
+                      <p className="mt-2 text-sm leading-relaxed text-foreground">Each attempt becomes a reusable study resource instead of a one-time score screen.</p>
+                    </div>
                   </div>
                 </div>
 
@@ -431,10 +462,15 @@ const PracticeTestView = () => {
   if (phase === "review") {
     return (
       <div className="min-h-screen bg-background">
-        <header className="bg-navy border-b border-navy-light/30 sticky top-0 z-50">
+        <header className="sticky top-0 z-50 border-b border-border/70 bg-background/88 backdrop-blur-xl">
           <div className="container mx-auto px-4 flex items-center h-16">
             <Link to="/dashboard" className="flex items-center gap-2">
-              <BrandLockup size="sm" subtitle="Practice Tests" />
+              <BrandLockup
+                size="sm"
+                subtitle="Practice Tests"
+                textClassName="text-foreground"
+                subtitleClassName="text-muted-foreground"
+              />
             </Link>
           </div>
         </header>
@@ -563,14 +599,14 @@ const PracticeTestView = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="bg-navy border-b border-navy-light/30 sticky top-0 z-50">
+      <header className="sticky top-0 z-50 border-b border-border/70 bg-background/88 backdrop-blur-xl">
         <div className="container mx-auto px-4 flex items-center justify-between h-16 gap-4">
           <div className="min-w-0">
-            <p className="text-[10px] uppercase tracking-[0.24em] text-primary-foreground/50 mb-1">Timed practice test</p>
-            <p className="font-heading text-sm sm:text-base font-semibold text-primary-foreground truncate">{test.title}</p>
+            <p className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground mb-1">Timed practice test</p>
+            <p className="font-heading text-sm sm:text-base font-semibold text-foreground truncate">{test.title}</p>
           </div>
           <div className="flex items-center gap-3 sm:gap-4">
-            <span className={`hidden sm:flex items-center gap-1.5 font-mono text-sm font-bold ${timeWarning ? "text-red-300 animate-pulse" : "text-white"}`}>
+            <span className={`hidden sm:flex items-center gap-1.5 font-mono text-sm font-bold ${timeWarning ? "text-red-500 animate-pulse" : "text-foreground"}`}>
               {timeWarning && <AlertTriangle className="h-4 w-4" />}
               <Timer className="h-4 w-4" />
               {formatClock(timeLeft)}

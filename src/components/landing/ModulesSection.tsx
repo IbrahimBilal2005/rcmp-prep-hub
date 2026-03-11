@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { BookOpen, Brain, Calculator, FileText, Languages, MoveUpRight, Shapes, Users } from "lucide-react";
+import DashboardPreviewDialog from "@/components/landing/DashboardPreviewDialog";
 import {
   Dialog,
   DialogContent,
@@ -149,6 +150,24 @@ const ModulesSection = () => {
                 </DialogContent>
               </Dialog>
             ))}
+          </div>
+
+          <div className="mt-8">
+            <DashboardPreviewDialog>
+              <button
+                type="button"
+                className="group flex w-full items-center justify-between rounded-[1.5rem] border border-emerald-200 bg-emerald-50 px-5 py-4 text-left shadow-[0_16px_38px_-30px_rgba(22,101,52,0.35)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-emerald-100"
+              >
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-700">Dashboard preview</p>
+                  <p className="mt-2 text-base font-semibold text-emerald-900">See how modules, tests, and results look inside the actual study flow</p>
+                </div>
+                <span className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700">
+                  Open sample view
+                  <MoveUpRight className="h-4 w-4 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                </span>
+              </button>
+            </DashboardPreviewDialog>
           </div>
         </div>
       </div>

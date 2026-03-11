@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { ArrowRight, BookOpen, Timer, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import DashboardPreviewDialog from "@/components/landing/DashboardPreviewDialog";
 import logoMark from "@/assets/logo-mark.png";
 
 const heroStats = [
@@ -93,37 +94,48 @@ const HeroSection = () => {
             transition={{ duration: 0.7, delay: 0.2 }}
             className="relative xl:-translate-y-10"
           >
-            <div className="panel mesh-panel rounded-[2.4rem] p-6 sm:p-7">
-              <div className="rounded-[1.9rem] border border-white/70 bg-white/55 p-5 backdrop-blur-xl">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">Study cadence</span>
-                  <span className="rounded-full bg-accent/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-accent">Premium flow</span>
-                </div>
-                <div className="mt-7 space-y-5">
-                  <div className="rounded-[1.6rem] bg-navy px-5 py-5 text-primary-foreground shadow-[0_18px_50px_-32px_rgba(4,16,24,0.72)]">
-                    <p className="text-[11px] uppercase tracking-[0.28em] text-primary-foreground/60">Current focus</p>
-                    <p className="mt-3 font-heading text-4xl font-semibold">Timed simulation</p>
-                    <div className="mt-6 h-2 overflow-hidden rounded-full bg-white/10">
-                      <div className="h-full w-[68%] rounded-full gradient-gold" />
-                    </div>
-                    <div className="mt-3 flex items-center justify-between text-sm text-primary-foreground/68">
-                      <span>17 questions completed</span>
-                      <span>68% through</span>
+            <DashboardPreviewDialog>
+                <button type="button" className="group block w-full text-left">
+                  <div className="panel mesh-panel rounded-[2.4rem] p-6 transition-transform duration-300 group-hover:-translate-y-1 sm:p-7">
+                    <div className="rounded-[1.9rem] border border-white/70 bg-white/55 p-5 backdrop-blur-xl transition-colors duration-300 group-hover:bg-white/64">
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">Study cadence</span>
+                        <span className="rounded-full bg-accent/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-accent">Premium flow</span>
+                      </div>
+                      <div className="mt-7 space-y-5">
+                        <div className="rounded-[1.6rem] bg-navy px-5 py-5 text-primary-foreground shadow-[0_18px_50px_-32px_rgba(4,16,24,0.72)]">
+                          <p className="text-[11px] uppercase tracking-[0.28em] text-primary-foreground/60">Current focus</p>
+                          <p className="mt-3 font-heading text-4xl font-semibold">Timed simulation</p>
+                          <div className="mt-6 h-2 overflow-hidden rounded-full bg-white/10">
+                            <div className="h-full w-[68%] rounded-full gradient-gold" />
+                          </div>
+                          <div className="mt-3 flex items-center justify-between text-sm text-primary-foreground/68">
+                            <span>17 questions completed</span>
+                            <span>68% through</span>
+                          </div>
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="rounded-[1.5rem] border border-border/60 bg-white/70 p-4">
+                            <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Average pace</p>
+                            <p className="mt-3 font-heading text-3xl font-semibold text-foreground">1.8m</p>
+                          </div>
+                          <div className="rounded-[1.5rem] border border-border/60 bg-white/70 p-4">
+                            <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Best streak</p>
+                            <p className="mt-3 font-heading text-3xl font-semibold text-foreground">12</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between rounded-[1.4rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm shadow-[0_14px_34px_-28px_rgba(22,101,52,0.35)]">
+                          <span className="font-medium text-emerald-900">Take a look under the hood</span>
+                          <span className="inline-flex items-center gap-2 text-emerald-700">
+                            View details
+                            <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="rounded-[1.5rem] border border-border/60 bg-white/70 p-4">
-                      <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Average pace</p>
-                      <p className="mt-3 font-heading text-3xl font-semibold text-foreground">1.8m</p>
-                    </div>
-                    <div className="rounded-[1.5rem] border border-border/60 bg-white/70 p-4">
-                      <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Best streak</p>
-                      <p className="mt-3 font-heading text-3xl font-semibold text-foreground">12</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+                </button>
+            </DashboardPreviewDialog>
           </motion.div>
         </div>
       </div>
