@@ -16,6 +16,7 @@ const Navbar = () => {
             subtitle="RCMP Prep"
             textClassName="text-[hsl(0_0%_98%)]"
             subtitleClassName="text-[rgba(226,235,248,0.72)]"
+            logoShell="solid"
           />
         </Link>
 

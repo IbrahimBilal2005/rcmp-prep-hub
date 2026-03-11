@@ -19,7 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { modules, practiceTests } from "@/data/courseData";
-import { FREE_PREVIEW_MODULE_ID, FREE_PREVIEW_TEST_ID, canAccessModule, canAccessTest } from "@/lib/access";
+import { FREE_PREVIEW_MODULE_ID, FREE_PREVIEW_TEST_ID, canAccessModule, canAccessTest, isFreePreviewMode } from "@/lib/access";
 import { getAllModuleProgress, isModuleFullyCompleted } from "@/lib/moduleProgressStorage";
 import {
   getBestPracticeAttempt,
@@ -162,6 +162,16 @@ const Dashboard = () => {
     }
 
     if (accessibleModules.every((mod) => isModuleFullyCompleted(moduleProgress[mod.id], mod.lessons.length))) {
+      if (isFreePreviewMode()) {
+        return {
+          eyebrow: "Keep building momentum",
+          title: "Unlock the next timed test",
+          body: "You have finished the free preview path. Upgrade to premium to open the next timed test and the rest of the study library.",
+          cta: "Upgrade now",
+          action: () => navigate("/signup?step=plan"),
+        };
+      }
+
       return {
         eyebrow: "Keep building momentum",
         title: `Revisit ${nextTest.title}`,
@@ -356,17 +366,19 @@ const Dashboard = () => {
                             />
                           </div>
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          {accessible
+                        {(() => {
+                          const moduleMessage = accessible
                             ? isComplete
-                              ? "Every lesson is complete and the quiz was passed at 100%."
+                              ? null
                               : progress?.quizCompleted
-                                ? "Quiz finished, but this module only counts as complete after a perfect score and all lessons marked done."
+                                ? null
                                 : progress?.started
                                   ? `Resume from lesson ${(progress.lastLessonIndex ?? 0) + 1} or move into the quiz when ready.`
-                                  : "Available in the free plan."
-                            : "Unlock full access to open this module and its quiz."}
-                        </p>
+                                  : null
+                            : "Unlock full access to open this module and its quiz.";
+
+                          return moduleMessage ? <p className="text-sm text-muted-foreground">{moduleMessage}</p> : null;
+                        })()}
                       </div>
                       {accessible ? (
                         <ArrowRight className="h-5 w-5 text-muted-foreground/50 group-hover:text-accent transition-colors flex-shrink-0 mt-1" />

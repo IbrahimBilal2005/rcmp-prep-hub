@@ -7,6 +7,7 @@ interface BrandLockupProps {
   textClassName?: string;
   subtitleClassName?: string;
   size?: "sm" | "md";
+  logoShell?: "glass" | "solid";
 }
 
 const BrandLockup = ({
@@ -15,12 +16,20 @@ const BrandLockup = ({
   textClassName,
   subtitleClassName,
   size = "md",
+  logoShell = "glass",
 }: BrandLockupProps) => {
   const logoSize = size === "sm" ? "h-10 w-10" : "h-12 w-12";
 
   return (
     <div className={cn("flex items-center gap-3", className)}>
-      <div className="rounded-[1.35rem] border border-white/70 bg-white/60 p-1.5 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.28)] ring-1 ring-white/40 backdrop-blur-xl">
+      <div
+        className={cn(
+          "rounded-[1.35rem] p-1.5",
+          logoShell === "solid"
+            ? "bg-white shadow-[0_16px_34px_-24px_rgba(15,23,42,0.22)]"
+            : "border border-white/70 bg-white/60 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.28)] ring-1 ring-white/40 backdrop-blur-xl",
+        )}
+      >
         <img src={logo} alt="AptitudeForge logo" className={cn("object-contain", logoSize)} />
       </div>
       <div className="min-w-0">

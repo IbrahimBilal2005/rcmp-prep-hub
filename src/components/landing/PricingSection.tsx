@@ -11,8 +11,9 @@ const PricingSection = () => {
         <div className="mb-10 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)] lg:items-end">
           <div>
             <span className="eyebrow">Plans</span>
-            <h2 className="section-heading mt-5">
-              One signup flow, two levels of access.
+            <h2 className="section-heading mt-5 max-w-4xl">
+              <span className="block">Start free.</span>
+              <span className="block text-gradient">Upgrade when ready.</span>
             </h2>
           </div>
           <p className="section-copy lg:ml-auto lg:max-w-sm">
@@ -56,20 +57,20 @@ const PricingSection = () => {
                   <div className="mb-6 flex items-start justify-between gap-4">
                     <div>
                       <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-accent">{plan.accessLabel}</p>
-                      <h3 className={`mb-2 font-heading text-[2.4rem] font-semibold leading-none ${isPremium ? "text-primary-foreground" : "text-foreground"}`}>
-                        {plan.name}
-                      </h3>
-                      <div className="mb-3 flex items-end gap-2">
-                        <span className={`font-heading text-6xl font-semibold leading-none ${isPremium ? "text-primary-foreground" : "text-foreground"}`}>
-                          {plan.priceLabel}
-                        </span>
-                        <span className={`pb-1 text-lg ${isPremium ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
-                          {plan.currency}
-                        </span>
-                      </div>
-                      <p className={`text-sm leading-relaxed ${isPremium ? "text-primary-foreground/72" : "text-muted-foreground"}`}>
-                        {plan.summary}
-                      </p>
+                    <h3 className={`font-heading text-[2.4rem] font-semibold leading-none ${isPremium ? "text-primary-foreground" : "text-foreground"}`}>
+                      {plan.name}
+                    </h3>
+                    <div className="mt-4 flex items-end gap-2">
+                      <span className={`font-heading text-6xl font-semibold leading-none ${isPremium ? "text-primary-foreground" : "text-foreground"}`}>
+                        {plan.priceLabel}
+                      </span>
+                      <span className={`pb-1 text-lg ${isPremium ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                        {plan.currency}
+                      </span>
+                    </div>
+                    <p className={`mt-5 max-w-xl text-sm leading-relaxed ${isPremium ? "text-primary-foreground/72" : "text-muted-foreground"}`}>
+                      {plan.summary}
+                    </p>
                     </div>
                     {isPremium ? (
                       <Crown className="h-5 w-5 flex-shrink-0 text-accent" />

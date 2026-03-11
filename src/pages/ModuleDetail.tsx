@@ -369,11 +369,6 @@ const ModuleDetail = () => {
                 </h3>
                 <p className="text-4xl font-heading font-bold text-foreground mb-1">{score}/{quiz.length}</p>
                 <p className="text-muted-foreground mb-6">{Math.round((score / quiz.length) * 100)}% correct</p>
-                {score !== quiz.length && (
-                  <p className="mx-auto mb-6 max-w-xl text-sm text-muted-foreground">
-                    This module is only marked complete when every lesson is checked off and the quiz score reaches 100%.
-                  </p>
-                )}
                 <div className="w-full max-w-xl mx-auto bg-background rounded-full h-3 mb-6 overflow-hidden">
                   <div className="h-full gradient-accent rounded-full transition-all duration-500" style={{ width: `${(score / quiz.length) * 100}%` }} />
                 </div>

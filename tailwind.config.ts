@@ -15,7 +15,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        heading: ['"DM Serif Display"', 'Georgia', 'serif'],
+        heading: ['"Space Grotesk"', 'ui-sans-serif', 'sans-serif'],
         body: ['"Manrope"', 'ui-sans-serif', 'sans-serif'],
       },
       colors: {

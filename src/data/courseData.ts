@@ -181,7 +181,7 @@ export const practiceTests: PracticeTest[] = [
   {
     id: "memory",
     title: "Memory & Observation",
-    description: "Test your ability to recall details and observe patterns.",
+    description: "Test your ability to recall details accurately and observe patterns under pressure.",
     questions: 8,
     time: 12,
     category: "Memory",

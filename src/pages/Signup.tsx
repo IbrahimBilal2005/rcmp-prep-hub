@@ -243,7 +243,7 @@ const Signup = () => {
                         key={plan.id}
                         type="button"
                         onClick={() => setSelectedPlan(plan.tier)}
-                        className={`rounded-3xl border p-7 text-left transition-all ${
+                        className={`flex h-full flex-col rounded-3xl border p-7 text-left transition-all ${
                           active
                             ? isPremium
                               ? "border-accent/40 shadow-xl bg-card"
@@ -251,21 +251,24 @@ const Signup = () => {
                             : "border-border/70 hover:border-accent/20"
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-4 mb-5">
-                          <div>
-                            <p className="text-xs font-semibold tracking-[0.24em] uppercase text-accent mb-2">{plan.accessLabel}</p>
-                            <h3 className="font-heading text-3xl font-bold text-foreground mb-1">{plan.name}</h3>
-                            <div className="flex items-end gap-2">
-                              <span className="text-4xl font-heading font-bold text-foreground">{plan.priceLabel}</span>
-                              <span className="text-muted-foreground pb-1">{plan.currency}</span>
-                            </div>
+                        <div className="mb-5 flex min-h-[16.5rem] flex-col">
+                          <div className="flex items-start justify-between gap-4">
+                            <p className="pt-1 text-xs font-semibold uppercase tracking-[0.24em] text-accent">{plan.accessLabel}</p>
+                            {isPremium ? <Crown className="mt-0.5 h-5 w-5 flex-shrink-0 text-accent" /> : <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-accent" />}
                           </div>
-                          {isPremium ? <Crown className="h-5 w-5 text-accent" /> : <Check className="h-5 w-5 text-accent" />}
+                          <div className="mt-5 min-h-[2.75rem]">
+                            <h3 className="font-heading text-3xl font-bold leading-[1.05] text-foreground">{plan.name}</h3>
+                          </div>
+                          <div className="mt-3 flex min-h-[3.5rem] items-end gap-2">
+                            <span className="text-4xl font-heading font-bold leading-none text-foreground">{plan.priceLabel}</span>
+                            <span className="pb-1 text-muted-foreground">{plan.currency}</span>
+                          </div>
+                          <div className="mt-3 min-h-[4.5rem]">
+                            <p className="text-sm leading-relaxed text-muted-foreground">{plan.summary}</p>
+                          </div>
                         </div>
 
-                        <p className="text-sm text-muted-foreground leading-relaxed mb-6">{plan.summary}</p>
-
-                        <div className="space-y-3">
+                        <div className={`${isPremium ? "mt-auto" : "mt-auto -translate-y-4"} space-y-3`}>
                           {plan.includes.map((item) => (
                             <div key={item} className="flex items-center gap-3 rounded-2xl bg-muted/60 px-4 py-3">
                               <Check className="h-4 w-4 text-accent flex-shrink-0" />

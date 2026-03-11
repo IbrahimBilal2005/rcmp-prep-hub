@@ -7,7 +7,13 @@ const Footer = () => {
         <div className="panel-inverse rounded-[2.2rem] px-6 py-8 sm:px-8 sm:py-10">
           <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <BrandLockup size="sm" subtitle="RCMP Prep" />
+              <BrandLockup
+                size="sm"
+                subtitle="RCMP Prep"
+                logoShell="solid"
+                textClassName="text-[hsl(0_0%_98%)]"
+                subtitleClassName="text-[rgba(226,235,248,0.72)]"
+              />
               <p className="mt-4 max-w-md text-sm leading-7 text-primary-foreground/62">
                 Structured RCMP-style preparation with guided modules, timed practice, and review tools built for consistent improvement.
               </p>

@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { ArrowRight, BookOpen, ShieldCheck, Timer, Trophy } from "lucide-react";
+import { ArrowRight, BookOpen, Timer, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import logoMark from "@/assets/logo-mark.png";
 
@@ -29,13 +29,6 @@ const HeroSection = () => {
       <div className="app-shell relative z-10 pb-12 sm:pb-16 lg:pb-24">
         <div className="grid items-end gap-10 xl:grid-cols-[minmax(0,1.15fr)_minmax(22rem,30rem)] xl:gap-14">
           <div className="max-w-4xl">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-              <span className="eyebrow mb-8">
-                <ShieldCheck className="h-3.5 w-3.5 text-accent" />
-                RCMP aptitude test prep
-              </span>
-            </motion.div>
-
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -43,7 +36,7 @@ const HeroSection = () => {
               className="flex max-w-5xl flex-col gap-2 pb-3 font-semibold leading-[1] tracking-[-0.03em] text-foreground"
             >
               <span className="block whitespace-nowrap text-[3.35rem] sm:text-[4.45rem] lg:text-[5.45rem]">Prepare smarter.</span>
-              <span className="block whitespace-nowrap text-[3.6rem] text-gradient sm:text-[4.9rem] lg:text-[5.9rem]">Perform better.</span>
+              <span className="block whitespace-nowrap text-[3.6rem] text-gradient sm:text-[4.82rem] lg:text-[5.68rem]">Perform better.</span>
             </motion.h1>
 
             <motion.div
