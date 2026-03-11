@@ -1,68 +1,39 @@
-import { Link, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { BookOpen, BarChart3, Clock, Shield, ArrowRight, Play, Timer, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Shield, BookOpen, Calculator, Brain, Shapes, Languages, FileText, Users,
-  Play, Lock, ArrowRight, LogOut, BarChart3, Clock
-} from "lucide-react";
+import DashboardHeader from "@/components/dashboard/DashboardHeader";
+import { modules, practiceTests } from "@/data/courseData";
 
-const modules = [
-  { id: 1, icon: BookOpen, title: "Understanding the RCMP Aptitude Test", lessons: 4, duration: "45 min", unlocked: true },
-  { id: 2, icon: Calculator, title: "Numerical Skills", lessons: 8, duration: "2 hrs", unlocked: true },
-  { id: 3, icon: Brain, title: "Memory & Observation", lessons: 6, duration: "1.5 hrs", unlocked: true },
-  { id: 4, icon: Shapes, title: "Spatial Reasoning", lessons: 7, duration: "1.5 hrs", unlocked: true },
-  { id: 5, icon: Languages, title: "Language & Logical Reasoning", lessons: 6, duration: "1.5 hrs", unlocked: true },
-  { id: 6, icon: FileText, title: "Full Practice Tests", lessons: 5, duration: "3 hrs", unlocked: true },
-  { id: 7, icon: Users, title: "Work Style & Professional Judgment", lessons: 5, duration: "1 hr", unlocked: true },
-];
-
-const practiceTests = [
-  { title: "Numerical Reasoning", questions: 25, time: "30 min" },
-  { title: "Memory & Observation", questions: 20, time: "25 min" },
-  { title: "Language Reasoning", questions: 25, time: "30 min" },
-  { title: "Spatial Reasoning", questions: 20, time: "25 min" },
-  { title: "Full RCMP Simulation", questions: 100, time: "120 min" },
-];
+type Tab = "modules" | "tests";
 
 const Dashboard = () => {
+  const [activeTab, setActiveTab] = useState<Tab>("modules");
   const navigate = useNavigate();
+
+  const stats = [
+    { label: "Modules Completed", value: "0/7", icon: BookOpen },
+    { label: "Tests Taken", value: "0", icon: BarChart3 },
+    { label: "Study Time", value: "0 hrs", icon: Clock },
+    { label: "Days Remaining", value: "180", icon: Shield },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-navy border-b border-navy-light/30 sticky top-0 z-50">
-        <div className="container mx-auto px-4 flex items-center justify-between h-16">
-          <Link to="/" className="flex items-center gap-2">
-            <Shield className="h-7 w-7 text-accent" />
-            <span className="font-heading text-lg font-bold text-primary-foreground">AptitudeForge</span>
-          </Link>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-primary-foreground/50 hidden sm:block">Welcome back</span>
-            <Link to="/">
-              <Button variant="ghost" size="sm" className="text-primary-foreground/50 hover:text-primary-foreground hover:bg-navy-light">
-                <LogOut className="h-4 w-4 mr-1" /> Logout
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
+      <DashboardHeader />
 
       <div className="container mx-auto px-4 py-8">
-        {/* Stats */}
+        {/* Stats row */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
         >
-          {[
-            { label: "Modules Completed", value: "0/7", icon: BookOpen },
-            { label: "Practice Tests Taken", value: "0", icon: BarChart3 },
-            { label: "Study Time", value: "0 hrs", icon: Clock },
-            { label: "Days Remaining", value: "180", icon: Shield },
-          ].map((stat) => (
+          {stats.map((stat) => (
             <div key={stat.label} className="glass-card rounded-xl p-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
                   <stat.icon className="h-5 w-5 text-accent" />
                 </div>
                 <div>
@@ -74,63 +45,111 @@ const Dashboard = () => {
           ))}
         </motion.div>
 
-        {/* Training Modules */}
-        <section className="mb-12">
-          <h2 className="text-2xl font-heading font-bold text-foreground mb-6">Training Modules</h2>
-          <div className="space-y-3">
-            {modules.map((mod, i) => (
-              <motion.div
-                key={mod.id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.05 }}
-              >
-                <button
-                  onClick={() => navigate(`/module/${mod.id}`)}
-                  className="w-full glass-card rounded-xl p-5 flex items-center gap-4 hover:border-accent/30 hover:shadow-md transition-all duration-200 text-left"
-                >
-                  <div className="w-12 h-12 rounded-lg gradient-accent flex items-center justify-center flex-shrink-0">
-                    <mod.icon className="h-6 w-6 text-accent-foreground" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground font-medium">Module {mod.id}</p>
-                    <p className="font-semibold text-foreground truncate">{mod.title}</p>
-                  </div>
-                  <div className="hidden sm:flex items-center gap-6 text-sm text-muted-foreground">
-                    <span>{mod.lessons} lessons</span>
-                    <span>{mod.duration}</span>
-                  </div>
-                  <ArrowRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                </button>
-              </motion.div>
-            ))}
-          </div>
-        </section>
+        {/* Tab switcher */}
+        <div className="flex gap-1 p-1 bg-muted rounded-xl mb-8 max-w-md">
+          {[
+            { key: "modules" as Tab, label: "Training Modules", icon: BookOpen },
+            { key: "tests" as Tab, label: "Practice Tests", icon: Timer },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                activeTab === tab.key
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <tab.icon className="h-4 w-4" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-        {/* Practice Tests */}
-        <section>
-          <h2 className="text-2xl font-heading font-bold text-foreground mb-6">Practice Tests</h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {practiceTests.map((test, i) => (
-              <motion.div
-                key={test.title}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 + i * 0.05 }}
-                className="glass-card rounded-xl p-5 hover:border-accent/30 hover:shadow-md transition-all duration-200 cursor-pointer"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <h3 className="font-semibold text-foreground">{test.title}</h3>
-                  <Play className="h-5 w-5 text-accent flex-shrink-0" />
-                </div>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <span>{test.questions} questions</span>
-                  <span>{test.time}</span>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </section>
+        {/* Tab content */}
+        <AnimatePresence mode="wait">
+          {activeTab === "modules" ? (
+            <motion.div
+              key="modules"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="grid gap-4 md:grid-cols-2">
+                {modules.map((mod, i) => (
+                  <motion.button
+                    key={mod.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.04 }}
+                    onClick={() => navigate(`/module/${mod.id}`)}
+                    className="glass-card rounded-xl p-5 flex items-start gap-4 hover:border-accent/30 hover:shadow-lg transition-all duration-200 text-left group"
+                  >
+                    <div className="w-12 h-12 rounded-lg gradient-accent flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                      <mod.icon className="h-6 w-6 text-accent-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-accent font-semibold mb-0.5">Module {mod.id}</p>
+                      <p className="font-semibold text-foreground mb-1 leading-snug">{mod.title}</p>
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1"><BookOpen className="h-3 w-3" />{mod.lessons.length} lessons</span>
+                        <span className="flex items-center gap-1"><HelpCircle className="h-3 w-3" />{mod.quiz.length} quiz Qs</span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {mod.lessons.reduce((a, l) => a + parseInt(l.duration), 0)} min
+                        </span>
+                      </div>
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-muted-foreground/50 group-hover:text-accent transition-colors flex-shrink-0 mt-1" />
+                  </motion.button>
+                ))}
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="tests"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              <p className="text-muted-foreground mb-6">Timed practice tests to simulate real exam conditions. Your score and breakdown will be shown at the end.</p>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {practiceTests.map((test, i) => (
+                  <motion.div
+                    key={test.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="glass-card rounded-xl p-6 hover:border-accent/30 hover:shadow-lg transition-all duration-200 group"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="w-11 h-11 rounded-lg bg-navy flex items-center justify-center">
+                        <test.icon className="h-5 w-5 text-accent" />
+                      </div>
+                      <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded-md">{test.category}</span>
+                    </div>
+                    <h3 className="font-heading font-semibold text-foreground mb-1">{test.title}</h3>
+                    <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{test.description}</p>
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground mb-5">
+                      <span className="flex items-center gap-1"><HelpCircle className="h-3 w-3" />{test.testQuestions.length} questions</span>
+                      <span className="flex items-center gap-1"><Timer className="h-3 w-3" />{test.time} min</span>
+                    </div>
+                    <Button
+                      variant="hero"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => navigate(`/test/${test.id}`)}
+                    >
+                      <Play className="h-4 w-4 mr-1" /> Start Test
+                    </Button>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
