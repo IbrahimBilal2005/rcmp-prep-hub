@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { MotionConfig } from "framer-motion";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { isAuthenticated } from "@/lib/auth";
 import { AppProviders } from "@/providers/AppProviders";
@@ -30,20 +31,22 @@ const ScrollToTop = () => {
 
 const App = () => (
   <AppProviders>
-    <BrowserRouter>
-      <ScrollToTop />
-      <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route element={<RequireAuth />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/module/:id" element={<ModuleDetail />} />
-          <Route path="/module/:id/lesson/:lessonIndex" element={<LessonView />} />
-          <Route path="/test/:id" element={<PracticeTestView />} />
-        </Route>
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </BrowserRouter>
+    <MotionConfig reducedMotion="user">
+      <BrowserRouter>
+        <ScrollToTop />
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route element={<RequireAuth />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/module/:id" element={<ModuleDetail />} />
+            <Route path="/module/:id/lesson/:lessonIndex" element={<LessonView />} />
+            <Route path="/test/:id" element={<PracticeTestView />} />
+          </Route>
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </MotionConfig>
   </AppProviders>
 );
 

@@ -3,10 +3,11 @@ import { motion } from "framer-motion";
 import { ArrowRight, Check, Crown, Shield, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { billingPlans } from "@/data/billingPlans";
+import { revealTransition, revealUp, revealViewport, revealVisible } from "@/lib/motion";
 
 const PricingSection = () => {
   return (
-    <section id="pricing" className="section-wash scroll-mt-24 bg-transparent py-10 sm:scroll-mt-28 sm:py-12">
+    <section id="pricing" className="section-wash deferred-section scroll-mt-24 bg-transparent py-10 sm:scroll-mt-28 sm:py-12">
       <div className="app-shell">
         <div className="mb-10 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)] lg:items-end">
           <div>
@@ -29,10 +30,10 @@ const PricingSection = () => {
           </div>
 
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
+            initial={revealUp}
+            whileInView={revealVisible}
+            viewport={revealViewport}
+            transition={revealTransition()}
             className="grid gap-6 xl:grid-cols-[0.94fr_1.06fr]"
           >
             {billingPlans.map((plan) => {

@@ -4,6 +4,7 @@ import { ArrowRight, BookOpen, Timer, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DashboardPreviewDialog from "@/components/landing/DashboardPreviewDialog";
 import logoMark from "@/assets/logo-mark.png";
+import { revealTransition, revealUp, revealUpLarge, revealVisible } from "@/lib/motion";
 
 const heroStats = [
   { label: "Focused modules", value: "7", icon: BookOpen },
@@ -31,9 +32,9 @@ const HeroSection = () => {
         <div className="grid items-end gap-10 xl:grid-cols-[minmax(0,1.15fr)_minmax(22rem,30rem)] xl:gap-14">
           <div className="max-w-4xl">
             <motion.h1
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
+              initial={revealUp}
+              animate={revealVisible}
+              transition={revealTransition(0.04)}
               className="flex max-w-5xl flex-col gap-2 pb-3 font-semibold leading-[1] tracking-[-0.03em] text-foreground"
             >
               <span className="block whitespace-nowrap text-[3.35rem] sm:text-[4.45rem] lg:text-[5.45rem]">Prepare smarter.</span>
@@ -41,9 +42,9 @@ const HeroSection = () => {
             </motion.h1>
 
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
+              initial={revealUp}
+              animate={revealVisible}
+              transition={revealTransition(0.1)}
               className="mt-8 max-w-xl"
             >
               <p className="section-copy text-[1.04rem]">
@@ -52,9 +53,9 @@ const HeroSection = () => {
             </motion.div>
 
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
+              initial={revealUp}
+              animate={revealVisible}
+              transition={revealTransition(0.16)}
               className="mt-10 flex flex-col gap-4 sm:flex-row"
             >
               <Link to="/signup?mode=signup">
@@ -71,9 +72,9 @@ const HeroSection = () => {
             </motion.div>
 
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
+              initial={revealUp}
+              animate={revealVisible}
+              transition={revealTransition(0.22)}
               className="mt-12 grid gap-4 sm:grid-cols-3"
             >
               {heroStats.map((stat) => (
@@ -89,9 +90,9 @@ const HeroSection = () => {
           </div>
 
           <motion.div
-            initial={{ opacity: 0, y: 28 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.2 }}
+            initial={revealUpLarge}
+            animate={revealVisible}
+            transition={revealTransition(0.12)}
             className="relative xl:-translate-y-10"
           >
             <DashboardPreviewDialog>

@@ -8,6 +8,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { revealTransition, revealUp, revealViewport, revealVisible } from "@/lib/motion";
 
 const steps = [
   {
@@ -50,7 +51,7 @@ const steps = [
 
 const HowItWorksSection = () => {
   return (
-    <section id="how-it-works" className="section-wash scroll-mt-24 bg-transparent py-10 sm:scroll-mt-28 sm:py-12">
+    <section id="how-it-works" className="section-wash deferred-section scroll-mt-24 bg-transparent py-10 sm:scroll-mt-28 sm:py-12">
       <div className="app-shell">
         <div className="mb-10 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)] lg:items-end">
           <div>
@@ -72,10 +73,10 @@ const HowItWorksSection = () => {
                 <DialogTrigger asChild>
                   <motion.button
                     type="button"
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.4, delay: index * 0.08 }}
+                    initial={revealUp}
+                    whileInView={revealVisible}
+                    viewport={revealViewport}
+                    transition={revealTransition(index * 0.05)}
                     className="glass-card rounded-[2rem] p-6 text-left sm:p-7"
                   >
                     <div className="flex items-start justify-between gap-4">

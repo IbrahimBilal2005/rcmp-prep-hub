@@ -185,6 +185,10 @@
   .section-wash {
     @apply relative overflow-hidden;
   }
+  .deferred-section {
+    content-visibility: auto;
+    contain-intrinsic-size: 960px;
+  }
   .section-card {
     @apply panel mesh-panel mx-auto max-w-7xl px-6 py-8 sm:px-10 sm:py-9 lg:px-14 lg:py-10;
   }

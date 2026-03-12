@@ -9,6 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { revealTransition, revealUp, revealViewport, revealVisible } from "@/lib/motion";
 
 const modules = [
   {
@@ -71,7 +72,7 @@ const modules = [
 
 const ModulesSection = () => {
   return (
-    <section id="modules" className="section-wash scroll-mt-24 bg-transparent py-10 sm:scroll-mt-28 sm:py-12">
+    <section id="modules" className="section-wash deferred-section scroll-mt-24 bg-transparent py-10 sm:scroll-mt-28 sm:py-12">
       <div className="app-shell">
         <div className="mb-10 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)] lg:items-end">
           <div>
@@ -93,10 +94,10 @@ const ModulesSection = () => {
                 <DialogTrigger asChild>
                   <motion.button
                     type="button"
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.4, delay: i * 0.08 }}
+                    initial={revealUp}
+                    whileInView={revealVisible}
+                    viewport={revealViewport}
+                    transition={revealTransition(i * 0.05)}
                     className={`group glass-card rounded-[2rem] p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:border-accent/20 sm:p-7 ${
                       i === 0 || i === 1
                         ? "lg:col-span-3"
