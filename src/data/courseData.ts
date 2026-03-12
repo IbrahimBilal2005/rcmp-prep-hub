@@ -8,12 +8,21 @@ export interface QuizQuestion {
   explanation: string;
 }
 
+export interface ModuleLesson {
+  title: string;
+  duration: string;
+  summary: string;
+  chapterLabel: string;
+  videoUrl: string | null;
+  posterUrl: string | null;
+}
+
 export interface ModuleInfo {
   id: number;
   icon: LucideIcon;
   title: string;
   description: string;
-  lessons: { title: string; duration: string }[];
+  lessons: ModuleLesson[];
   quiz: QuizQuestion[];
 }
 
@@ -28,16 +37,25 @@ export interface PracticeTest {
   testQuestions: QuizQuestion[];
 }
 
+const lesson = (title: string, duration: string, summary: string, chapterLabel: string): ModuleLesson => ({
+  title,
+  duration,
+  summary,
+  chapterLabel,
+  videoUrl: null,
+  posterUrl: null,
+});
+
 export const modules: ModuleInfo[] = [
   {
     id: 1, icon: BookOpen,
     title: "Understanding the RCMP Aptitude Test",
     description: "Learn the test format, scoring methodology, and develop a strategic approach to maximize your results on test day.",
     lessons: [
-      { title: "Test Overview & Format", duration: "12 min" },
-      { title: "Scoring Methodology", duration: "10 min" },
-      { title: "Time Management Strategies", duration: "15 min" },
-      { title: "Test Day Preparation", duration: "8 min" },
+      lesson("Test Overview & Format", "12 min", "Walk through the exam structure, section order, and what each part is designed to measure.", "Lesson 01"),
+      lesson("Scoring Methodology", "10 min", "Understand how performance is evaluated and where candidates most often give points away.", "Lesson 02"),
+      lesson("Time Management Strategies", "15 min", "Learn pacing rules that protect easy marks and keep you moving under pressure.", "Lesson 03"),
+      lesson("Test Day Preparation", "8 min", "Review the routines, expectations, and setup details that help you stay composed on exam day.", "Lesson 04"),
     ],
     quiz: [
       { question: "How many sections does the RCMP aptitude test typically contain?", options: ["3", "5", "7", "10"], correctIndex: 1, explanation: "The RCMP aptitude test typically contains 5 main sections covering different cognitive abilities." },
@@ -50,14 +68,14 @@ export const modules: ModuleInfo[] = [
     title: "Numerical Skills",
     description: "Master arithmetic reasoning, data interpretation, and number series through structured practice and proven strategies.",
     lessons: [
-      { title: "Basic Arithmetic Review", duration: "15 min" },
-      { title: "Fractions & Percentages", duration: "18 min" },
-      { title: "Number Series Patterns", duration: "20 min" },
-      { title: "Data Interpretation", duration: "15 min" },
-      { title: "Word Problems", duration: "18 min" },
-      { title: "Speed & Accuracy Tips", duration: "12 min" },
-      { title: "Practice Set A", duration: "20 min" },
-      { title: "Practice Set B", duration: "20 min" },
+      lesson("Basic Arithmetic Review", "15 min", "Refresh the arithmetic rules and mental-math habits used throughout the numerical section.", "Lesson 01"),
+      lesson("Fractions & Percentages", "18 min", "Work through percentage, ratio, and fraction conversions with quick comparison methods.", "Lesson 02"),
+      lesson("Number Series Patterns", "20 min", "Identify common progression rules faster by spotting multiplication, subtraction, and alternating structures.", "Lesson 03"),
+      lesson("Data Interpretation", "15 min", "Read tables, charts, and simple data sets without losing time to unnecessary recalculation.", "Lesson 04"),
+      lesson("Word Problems", "18 min", "Translate written scenarios into clean equations and isolate the number that actually matters.", "Lesson 05"),
+      lesson("Speed & Accuracy Tips", "12 min", "Use repeatable shortcuts to stay efficient without introducing avoidable mistakes.", "Lesson 06"),
+      lesson("Practice Set A", "20 min", "Apply the module techniques in a guided mixed set that emphasizes method over speed.", "Lesson 07"),
+      lesson("Practice Set B", "20 min", "Run a second numerical set with tighter pacing and more exam-style question switching.", "Lesson 08"),
     ],
     quiz: [
       { question: "What is 15% of 240?", options: ["30", "36", "42", "48"], correctIndex: 1, explanation: "15% of 240 = 0.15 × 240 = 36." },
@@ -71,12 +89,12 @@ export const modules: ModuleInfo[] = [
     title: "Memory & Observation",
     description: "Develop powerful techniques to recall details from images, text passages, and complex scenarios under time pressure.",
     lessons: [
-      { title: "Memory Techniques Overview", duration: "12 min" },
-      { title: "Visual Memory Training", duration: "18 min" },
-      { title: "Text Recall Strategies", duration: "15 min" },
-      { title: "Observation Exercises", duration: "20 min" },
-      { title: "Practice Scenarios", duration: "20 min" },
-      { title: "Timed Memory Challenge", duration: "15 min" },
+      lesson("Memory Techniques Overview", "12 min", "Compare the core recall methods that help candidates organize details instead of memorizing randomly.", "Lesson 01"),
+      lesson("Visual Memory Training", "18 min", "Train your eye to scan visual scenes in a consistent order before key details disappear.", "Lesson 02"),
+      lesson("Text Recall Strategies", "15 min", "Use chunking and keyword anchors to retain written details from short passages and reports.", "Lesson 03"),
+      lesson("Observation Exercises", "20 min", "Practice structured observation so your first pass captures layout, people, and distinguishing features.", "Lesson 04"),
+      lesson("Practice Scenarios", "20 min", "Work through applied memory scenarios that combine visual and written information under light pressure.", "Lesson 05"),
+      lesson("Timed Memory Challenge", "15 min", "Test your retention speed with a fast-paced drill that rewards disciplined recall habits.", "Lesson 06"),
     ],
     quiz: [
       { question: "Which memory technique involves creating a mental journey through familiar locations?", options: ["Chunking", "Method of Loci", "Spaced Repetition", "Mnemonics"], correctIndex: 1, explanation: "The Method of Loci (Memory Palace) involves placing items to remember along a familiar route." },
@@ -89,13 +107,13 @@ export const modules: ModuleInfo[] = [
     title: "Spatial Reasoning",
     description: "Practice pattern recognition, shape rotation, mirror images, and visual-spatial problem solving.",
     lessons: [
-      { title: "Introduction to Spatial Reasoning", duration: "10 min" },
-      { title: "Pattern Recognition", duration: "18 min" },
-      { title: "Shape Rotation & Folding", duration: "20 min" },
-      { title: "Mirror Images", duration: "15 min" },
-      { title: "2D to 3D Visualization", duration: "18 min" },
-      { title: "Practice Set A", duration: "15 min" },
-      { title: "Practice Set B", duration: "15 min" },
+      lesson("Introduction to Spatial Reasoning", "10 min", "Learn the visual rules behind rotation, reflection, and transformation-style test questions.", "Lesson 01"),
+      lesson("Pattern Recognition", "18 min", "Spot recurring visual relationships before getting distracted by decorative details.", "Lesson 02"),
+      lesson("Shape Rotation & Folding", "20 min", "Break rotation and fold questions into simple directional checks that reduce guesswork.", "Lesson 03"),
+      lesson("Mirror Images", "15 min", "Practice reflection problems by tracking edges, orientation, and reversal cues in sequence.", "Lesson 04"),
+      lesson("2D to 3D Visualization", "18 min", "Move from flat diagrams to object reasoning without losing track of hidden faces and edges.", "Lesson 05"),
+      lesson("Practice Set A", "15 min", "Work through guided spatial drills using the module's step-by-step visual method.", "Lesson 06"),
+      lesson("Practice Set B", "15 min", "Run a second mixed set that pushes faster recognition across several spatial question types.", "Lesson 07"),
     ],
     quiz: [
       { question: "When a shape is rotated 180°, which property always stays the same?", options: ["Position", "Orientation", "Size and shape", "Color only"], correctIndex: 2, explanation: "Rotation preserves size and shape (congruence). Only position and orientation change." },
@@ -108,12 +126,12 @@ export const modules: ModuleInfo[] = [
     title: "Language & Logical Reasoning",
     description: "Strengthen verbal comprehension, analogies, syllogisms, and logical deduction skills.",
     lessons: [
-      { title: "Verbal Comprehension", duration: "15 min" },
-      { title: "Analogies & Relationships", duration: "18 min" },
-      { title: "Logical Deduction", duration: "20 min" },
-      { title: "Syllogisms", duration: "15 min" },
-      { title: "Critical Reasoning", duration: "18 min" },
-      { title: "Practice Exercises", duration: "20 min" },
+      lesson("Verbal Comprehension", "15 min", "Sharpen close-reading habits so you answer what the prompt actually asks, not what it suggests.", "Lesson 01"),
+      lesson("Analogies & Relationships", "18 min", "Recognize word relationships quickly and avoid surface-level matches that break the pattern.", "Lesson 02"),
+      lesson("Logical Deduction", "20 min", "Use premise-based reasoning to eliminate choices that sound plausible but are not supported.", "Lesson 03"),
+      lesson("Syllogisms", "15 min", "Translate formal logic statements into simple structures you can test against each answer.", "Lesson 04"),
+      lesson("Critical Reasoning", "18 min", "Identify assumptions, weak arguments, and missing links in short reasoning prompts.", "Lesson 05"),
+      lesson("Practice Exercises", "20 min", "Apply the language and logic techniques across a mixed set of RCMP-style verbal questions.", "Lesson 06"),
     ],
     quiz: [
       { question: "'Hot' is to 'Cold' as 'Up' is to:", options: ["Left", "Down", "High", "Over"], correctIndex: 1, explanation: "Hot and Cold are antonyms, so the antonym of Up is Down." },
@@ -126,11 +144,11 @@ export const modules: ModuleInfo[] = [
     title: "Full Practice Tests",
     description: "Take timed, full-length RCMP simulation exams with detailed score breakdowns and answer explanations.",
     lessons: [
-      { title: "Practice Exam 1", duration: "45 min" },
-      { title: "Practice Exam 2", duration: "45 min" },
-      { title: "Practice Exam 3", duration: "45 min" },
-      { title: "Full Simulation A", duration: "60 min" },
-      { title: "Full Simulation B", duration: "60 min" },
+      lesson("Practice Exam 1", "45 min", "Run an early mixed exam to establish your baseline and see which sections break your rhythm first.", "Lesson 01"),
+      lesson("Practice Exam 2", "45 min", "Build on the first simulation with another timed set focused on consistency across question types.", "Lesson 02"),
+      lesson("Practice Exam 3", "45 min", "Use a third full run to tighten pacing and expose recurring weak spots before longer simulations.", "Lesson 03"),
+      lesson("Full Simulation A", "60 min", "Take a longer exam-style session that mirrors the pressure and concentration demands of the real test.", "Lesson 04"),
+      lesson("Full Simulation B", "60 min", "Complete a second long simulation to compare improvement, pacing, and decision quality under fatigue.", "Lesson 05"),
     ],
     quiz: [
       { question: "What is the recommended approach for a timed test?", options: ["Answer in order no matter what", "Read all questions first then answer", "Answer easy ones first, return to hard ones", "Spend equal time on every question"], correctIndex: 2, explanation: "Answering easy questions first builds confidence and ensures you don't miss points on questions you know." },
@@ -142,11 +160,11 @@ export const modules: ModuleInfo[] = [
     title: "Work Style & Professional Judgment",
     description: "Prepare for behavioral and situational assessment questions with real-world law enforcement scenarios.",
     lessons: [
-      { title: "Integrity & Accountability", duration: "12 min" },
-      { title: "Professional Responsibility", duration: "15 min" },
-      { title: "Teamwork & Cooperation", duration: "12 min" },
-      { title: "Handling Pressure & Stress", duration: "15 min" },
-      { title: "Situational Practice Questions", duration: "20 min" },
+      lesson("Integrity & Accountability", "12 min", "Review the judgment standards expected when professionalism and ethics are put under pressure.", "Lesson 01"),
+      lesson("Professional Responsibility", "15 min", "Work through responsibility-based scenarios where procedure and discretion need to stay balanced.", "Lesson 02"),
+      lesson("Teamwork & Cooperation", "12 min", "See how collaboration, communication, and role clarity affect workplace decision-making questions.", "Lesson 03"),
+      lesson("Handling Pressure & Stress", "15 min", "Practice choosing calm, procedural responses when a situation becomes tense or emotionally charged.", "Lesson 04"),
+      lesson("Situational Practice Questions", "20 min", "Apply the module principles across realistic judgment prompts built around law-enforcement contexts.", "Lesson 05"),
     ],
     quiz: [
       { question: "You notice a colleague taking office supplies home without permission. What would you most likely do?", options: ["Ignore it", "Confront them aggressively", "Report the behavior through proper channels", "Join them"], correctIndex: 2, explanation: "Law enforcement roles emphasize integrity and accountability. Reporting through proper channels is the professional response." },

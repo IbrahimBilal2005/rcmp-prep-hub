@@ -5,6 +5,7 @@ import { AppProviders } from "@/providers/AppProviders";
 import Index from "./pages/Index.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import ModuleDetail from "./pages/ModuleDetail.tsx";
+import LessonView from "./pages/LessonView.tsx";
 import PracticeTestView from "./pages/PracticeTestView.tsx";
 import Signup from "./pages/Signup.tsx";
 import NotFound from "./pages/NotFound.tsx";
@@ -37,6 +38,7 @@ const App = () => (
         <Route element={<RequireAuth />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/module/:id" element={<ModuleDetail />} />
+          <Route path="/module/:id/lesson/:lessonIndex" element={<LessonView />} />
           <Route path="/test/:id" element={<PracticeTestView />} />
         </Route>
         <Route path="*" element={<NotFound />} />

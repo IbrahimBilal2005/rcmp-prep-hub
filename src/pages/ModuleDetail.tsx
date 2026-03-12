@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -55,7 +55,8 @@ const LockedMask = ({
 
 const ModuleDetail = () => {
   const { id } = useParams();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const moduleId = Number(id);
   const mod = modules.find((m) => m.id === moduleId);
 
@@ -119,9 +120,6 @@ const ModuleDetail = () => {
   );
 
   const selectLesson = (index: number) => {
-    setSelectedLessonIndex(index);
-    setSearchParams({ lesson: String(index) });
-
     if (!isPreviewLessonUnlocked(moduleId, index)) {
       return;
     }
@@ -132,6 +130,8 @@ const ModuleDetail = () => {
       lastLessonIndex: index,
       updatedAt: new Date().toISOString(),
     }));
+
+    navigate(`/module/${moduleId}/lesson/${index}`);
   };
 
   const toggleLessonComplete = (index: number) => {
