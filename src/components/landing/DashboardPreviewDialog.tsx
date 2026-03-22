@@ -54,7 +54,7 @@ const DashboardPreviewDialog = ({ children }: DashboardPreviewDialogProps) => {
             ))}
           </div>
 
-          <div className="mt-7 grid gap-5 lg:grid-cols-2">
+          <div className="mt-7 space-y-5">
             <div className="glass-card rounded-3xl border border-border/70 p-6">
               <div className="mb-5 flex items-center justify-between gap-4">
                 <div>
@@ -66,7 +66,7 @@ const DashboardPreviewDialog = ({ children }: DashboardPreviewDialogProps) => {
                 </span>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 xl:grid-cols-4">
                 {modules.slice(0, 4).map((module, index) => (
                   <div
                     key={module.id}
@@ -114,7 +114,7 @@ const DashboardPreviewDialog = ({ children }: DashboardPreviewDialogProps) => {
                 </span>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 xl:grid-cols-4">
                 {practiceTests.slice(0, 4).map((test, index) => (
                   <div
                     key={test.id}

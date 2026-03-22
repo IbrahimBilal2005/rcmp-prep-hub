@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ArrowUpRight, BookOpen, Clock3, ShieldCheck, Trophy } from "lucide-react";
+import { ArrowUpRight, BookOpen, Clock3, ShieldCheck, Trophy, User } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -53,7 +53,7 @@ const HowItWorksSection = () => {
   return (
     <section id="how-it-works" className="section-wash deferred-section scroll-mt-24 bg-transparent py-10 sm:scroll-mt-28 sm:py-12">
       <div className="app-shell">
-        <div className="mb-10 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)] lg:items-end">
+        <div className="mb-10 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] lg:items-end">
           <div>
             <span className="eyebrow">How It Works</span>
             <h2 className="section-heading mt-5 max-w-4xl">
@@ -61,9 +61,22 @@ const HowItWorksSection = () => {
               <span className="block text-gradient">Perform under pressure.</span>
             </h2>
           </div>
-          <p className="section-copy lg:ml-auto lg:max-w-sm">
-            The flow moves from structured learning into realistic timed practice, giving you a clear study rhythm from first lesson to final simulation.
-          </p>
+          <div className="lg:ml-auto lg:max-w-md">
+            <div className="rounded-[1.45rem] border border-white/70 bg-white/40 px-5 py-5 shadow-[0_22px_60px_-46px_rgba(15,23,42,0.2)] backdrop-blur-xl">
+              <p className="text-[0.98rem] leading-7 text-foreground">
+                &quot;What helped most was seeing a clear order: study the module, do the quiz, then move into the timed work when I was ready.&quot;
+              </p>
+              <div className="mt-4 flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/10 ring-1 ring-accent/10">
+                  <User className="h-4 w-4 text-accent/75" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">Alyssa Grant</p>
+                  <p className="text-xs text-muted-foreground">Study flow clarity</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="section-card">

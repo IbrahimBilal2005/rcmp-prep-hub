@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, Check, Crown, Shield, Sparkles } from "lucide-react";
+import { ArrowRight, Check, Crown, Shield, Sparkles, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { billingPlans } from "@/data/billingPlans";
 import { revealTransition, revealUp, revealViewport, revealVisible } from "@/lib/motion";
@@ -9,7 +9,7 @@ const PricingSection = () => {
   return (
     <section id="pricing" className="section-wash deferred-section scroll-mt-24 bg-transparent py-10 sm:scroll-mt-28 sm:py-12">
       <div className="app-shell">
-        <div className="mb-10 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)] lg:items-end">
+        <div className="mb-10 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] lg:items-end">
           <div>
             <span className="eyebrow">Plans</span>
             <h2 className="section-heading mt-5 max-w-4xl">
@@ -17,9 +17,22 @@ const PricingSection = () => {
               <span className="block text-gradient">Upgrade when ready.</span>
             </h2>
           </div>
-          <p className="section-copy lg:ml-auto lg:max-w-sm">
-            Both paths start with the same signup flow. After account creation, users choose either the Free Plan or Premium Access and enter the matching dashboard.
-          </p>
+          <div className="lg:ml-auto lg:max-w-md">
+            <div className="rounded-[1.45rem] border border-white/70 bg-white/40 px-5 py-5 shadow-[0_22px_60px_-46px_rgba(15,23,42,0.2)] backdrop-blur-xl">
+              <p className="text-[0.98rem] leading-7 text-foreground">
+                &quot;I liked being able to start free, see the real dashboard, and only upgrade once I knew exactly what I was getting.&quot;
+              </p>
+              <div className="mt-4 flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/10 ring-1 ring-accent/10">
+                  <User className="h-4 w-4 text-accent/75" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">Jordan Hale</p>
+                  <p className="text-xs text-muted-foreground">Free to premium path</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="section-card">
@@ -97,7 +110,7 @@ const PricingSection = () => {
                           isPremium ? "border border-white/10 bg-white/5" : "bg-white/65"
                         }`}
                       >
-                        <Check className={`h-4 w-4 flex-shrink-0 ${isPremium ? "text-accent" : "text-accent"}`} />
+                        <Check className="h-4 w-4 flex-shrink-0 text-accent" />
                         <span className={`text-sm ${isPremium ? "text-primary-foreground" : "text-foreground"}`}>{item}</span>
                       </div>
                     ))}

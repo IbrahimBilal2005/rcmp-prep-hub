@@ -1,0 +1,241 @@
+create extension if not exists "pgcrypto";
+
+create type public.account_plan as enum ('free', 'premium');
+create type public.app_role as enum ('user', 'admin');
+
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = timezone('utc', now());
+  return new;
+end;
+$$;
+
+create table public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text unique,
+  full_name text,
+  plan public.account_plan not null default 'free',
+  role public.app_role not null default 'user',
+  access_expires_at timestamptz,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.profiles (id, email, full_name)
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data ->> 'full_name', '')
+  )
+  on conflict (id) do nothing;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+after insert on auth.users
+for each row execute procedure public.handle_new_user();
+
+create table public.modules (
+  id bigserial primary key,
+  slug text unique not null,
+  title text not null,
+  description text not null,
+  sort_order integer not null default 0,
+  is_published boolean not null default true,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table public.lessons (
+  id bigserial primary key,
+  module_id bigint not null references public.modules(id) on delete cascade,
+  title text not null,
+  chapter_label text,
+  summary text not null,
+  duration_minutes integer not null,
+  sort_order integer not null default 0,
+  video_path text,
+  poster_path text,
+  is_preview boolean not null default false,
+  is_published boolean not null default true,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table public.module_quiz_questions (
+  id bigserial primary key,
+  module_id bigint not null references public.modules(id) on delete cascade,
+  question text not null,
+  options jsonb not null,
+  correct_index integer not null check (correct_index >= 0),
+  explanation text not null,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table public.practice_tests (
+  id bigserial primary key,
+  slug text unique not null,
+  title text not null,
+  description text not null,
+  category text not null,
+  time_limit_minutes integer not null,
+  sort_order integer not null default 0,
+  is_preview boolean not null default false,
+  is_published boolean not null default true,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table public.practice_test_questions (
+  id bigserial primary key,
+  practice_test_id bigint not null references public.practice_tests(id) on delete cascade,
+  question text not null,
+  options jsonb not null,
+  correct_index integer not null check (correct_index >= 0),
+  explanation text not null,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table public.lesson_completions (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  lesson_id bigint not null references public.lessons(id) on delete cascade,
+  completed_at timestamptz not null default timezone('utc', now()),
+  primary key (user_id, lesson_id)
+);
+
+create table public.module_quiz_attempts (
+  id bigserial primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  module_id bigint not null references public.modules(id) on delete cascade,
+  score integer not null default 0,
+  total_questions integer not null default 0,
+  answers jsonb,
+  submitted_at timestamptz not null default timezone('utc', now())
+);
+
+create table public.practice_test_attempts (
+  id bigserial primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  practice_test_id bigint not null references public.practice_tests(id) on delete cascade,
+  score integer not null default 0,
+  total_questions integer not null default 0,
+  duration_seconds integer not null default 0,
+  answers jsonb,
+  submitted_at timestamptz not null default timezone('utc', now())
+);
+
+create table public.billing_accounts (
+  id bigserial primary key,
+  user_id uuid not null unique references auth.users(id) on delete cascade,
+  stripe_customer_id text unique,
+  stripe_subscription_id text unique,
+  stripe_price_id text,
+  billing_status text,
+  current_period_end timestamptz,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create trigger set_profiles_updated_at
+before update on public.profiles
+for each row execute procedure public.set_updated_at();
+
+create trigger set_modules_updated_at
+before update on public.modules
+for each row execute procedure public.set_updated_at();
+
+create trigger set_lessons_updated_at
+before update on public.lessons
+for each row execute procedure public.set_updated_at();
+
+create trigger set_module_quiz_questions_updated_at
+before update on public.module_quiz_questions
+for each row execute procedure public.set_updated_at();
+
+create trigger set_practice_tests_updated_at
+before update on public.practice_tests
+for each row execute procedure public.set_updated_at();
+
+create trigger set_practice_test_questions_updated_at
+before update on public.practice_test_questions
+for each row execute procedure public.set_updated_at();
+
+create trigger set_billing_accounts_updated_at
+before update on public.billing_accounts
+for each row execute procedure public.set_updated_at();
+
+alter table public.profiles enable row level security;
+alter table public.modules enable row level security;
+alter table public.lessons enable row level security;
+alter table public.module_quiz_questions enable row level security;
+alter table public.practice_tests enable row level security;
+alter table public.practice_test_questions enable row level security;
+alter table public.lesson_completions enable row level security;
+alter table public.module_quiz_attempts enable row level security;
+alter table public.practice_test_attempts enable row level security;
+alter table public.billing_accounts enable row level security;
+
+create policy "profiles_select_own"
+on public.profiles for select
+to authenticated
+using (auth.uid() = id);
+
+create policy "profiles_update_own"
+on public.profiles for update
+to authenticated
+using (auth.uid() = id);
+
+create policy "modules_read_authenticated"
+on public.modules for select
+to authenticated
+using (is_published = true);
+
+create policy "lessons_read_authenticated"
+on public.lessons for select
+to authenticated
+using (is_published = true);
+
+create policy "practice_tests_read_authenticated"
+on public.practice_tests for select
+to authenticated
+using (is_published = true);
+
+create policy "lesson_completions_own_all"
+on public.lesson_completions for all
+to authenticated
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+create policy "module_quiz_attempts_own_all"
+on public.module_quiz_attempts for all
+to authenticated
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+create policy "practice_test_attempts_own_all"
+on public.practice_test_attempts for all
+to authenticated
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+create policy "billing_accounts_own_select"
+on public.billing_accounts for select
+to authenticated
+using (auth.uid() = user_id);

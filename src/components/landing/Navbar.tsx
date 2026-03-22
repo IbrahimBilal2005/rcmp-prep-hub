@@ -9,26 +9,46 @@ const Navbar = () => {
 
   return (
     <nav className="fixed inset-x-0 top-4 z-50 px-4 sm:top-6 sm:px-6 lg:px-8">
-      <div className="mx-auto flex min-h-[4.75rem] max-w-[88rem] items-center justify-between rounded-full border border-[rgba(214,224,240,0.7)] bg-[linear-gradient(180deg,rgba(24,40,74,0.42),rgba(34,50,86,0.28))] px-4 shadow-[0_24px_80px_-42px_rgba(10,18,38,0.48),inset_0_1px_0_rgba(240,246,255,0.24)] backdrop-blur-2xl sm:px-6">
+      <div className="mx-auto flex min-h-[4.9rem] max-w-[88rem] items-center justify-between rounded-full border border-[rgba(225,235,248,0.88)] bg-[linear-gradient(180deg,rgba(243,248,255,0.72),rgba(229,238,248,0.52))] px-4 shadow-[0_28px_90px_-46px_rgba(15,23,42,0.24),inset_0_1px_0_rgba(255,255,255,0.96)] ring-1 ring-[rgba(236,244,255,0.52)] backdrop-blur-2xl sm:px-6">
         <Link to="/" className="flex items-center gap-2">
           <BrandLockup
             size="sm"
             subtitle="RCMP Prep"
-            textClassName="text-[hsl(0_0%_98%)]"
-            subtitleClassName="text-[rgba(226,235,248,0.72)]"
+            textClassName="text-foreground"
+            subtitleClassName="text-muted-foreground"
             logoShell="solid"
           />
         </Link>
 
         <div className="hidden items-center gap-3 lg:flex">
-          <a href="#modules" className="rounded-full px-4 py-2 text-sm text-[rgba(226,235,248,0.82)] transition-colors hover:bg-white/10 hover:text-white">Modules</a>
-          <a href="#pricing" className="rounded-full px-4 py-2 text-sm text-[rgba(226,235,248,0.82)] transition-colors hover:bg-white/10 hover:text-white">Pricing</a>
-          <a href="#how-it-works" className="rounded-full px-4 py-2 text-sm text-[rgba(226,235,248,0.82)] transition-colors hover:bg-white/10 hover:text-white">How It Works</a>
+          <a
+            href="#modules"
+            className="rounded-full border border-transparent px-4 py-2 text-sm font-medium text-foreground/78 transition-all hover:border-[rgba(232,240,250,0.95)] hover:bg-[rgba(255,255,255,0.58)] hover:text-foreground"
+          >
+            Modules
+          </a>
+          <a
+            href="#pricing"
+            className="rounded-full border border-transparent px-4 py-2 text-sm font-medium text-foreground/78 transition-all hover:border-[rgba(232,240,250,0.95)] hover:bg-[rgba(255,255,255,0.58)] hover:text-foreground"
+          >
+            Pricing
+          </a>
+          <a
+            href="#how-it-works"
+            className="rounded-full border border-transparent px-4 py-2 text-sm font-medium text-foreground/78 transition-all hover:border-[rgba(232,240,250,0.95)] hover:bg-[rgba(255,255,255,0.58)] hover:text-foreground"
+          >
+            How It Works
+          </a>
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
+          <Link to="/admin">
+            <Button variant="outline" className="h-11 px-5 bg-[rgba(245,250,255,0.24)] text-foreground hover:bg-[rgba(255,255,255,0.62)]">
+              Admin
+            </Button>
+          </Link>
           <Link to="/signup?mode=login">
-            <Button variant="ghost" className="h-11 px-5">
+            <Button variant="ghost" className="h-11 px-5 bg-[rgba(245,250,255,0.34)] text-foreground hover:bg-[rgba(255,255,255,0.62)]">
               Login
             </Button>
           </Link>
@@ -40,7 +60,10 @@ const Navbar = () => {
           </Link>
         </div>
 
-        <button className="rounded-full border border-white/70 bg-white/55 p-3 text-foreground backdrop-blur-xl md:hidden" onClick={() => setMobileOpen(!mobileOpen)}>
+        <button
+          className="rounded-full border border-[rgba(232,240,250,0.95)] bg-[rgba(244,249,255,0.68)] p-3 text-foreground shadow-[0_14px_36px_-24px_rgba(15,23,42,0.24)] backdrop-blur-xl md:hidden"
+          onClick={() => setMobileOpen(!mobileOpen)}
+        >
           {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </button>
       </div>
@@ -50,6 +73,11 @@ const Navbar = () => {
           <a href="#modules" className="block rounded-2xl px-3 py-3 text-sm text-muted-foreground hover:bg-white/50 hover:text-foreground" onClick={() => setMobileOpen(false)}>Modules</a>
           <a href="#pricing" className="block rounded-2xl px-3 py-3 text-sm text-muted-foreground hover:bg-white/50 hover:text-foreground" onClick={() => setMobileOpen(false)}>Pricing</a>
           <a href="#how-it-works" className="block rounded-2xl px-3 py-3 text-sm text-muted-foreground hover:bg-white/50 hover:text-foreground" onClick={() => setMobileOpen(false)}>How It Works</a>
+          <Link to="/admin" onClick={() => setMobileOpen(false)}>
+            <Button variant="outline" className="w-full justify-center bg-white/45">
+              Admin Dashboard
+            </Button>
+          </Link>
           <Link to="/signup?mode=login" onClick={() => setMobileOpen(false)}>
             <Button variant="ghost" className="w-full justify-center">Login</Button>
           </Link>

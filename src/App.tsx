@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "rea
 import { isAuthenticated } from "@/lib/auth";
 import { AppProviders } from "@/providers/AppProviders";
 import Index from "./pages/Index.tsx";
+import AdminDashboard from "./pages/AdminDashboard.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import ModuleDetail from "./pages/ModuleDetail.tsx";
 import LessonView from "./pages/LessonView.tsx";
@@ -36,6 +37,7 @@ const App = () => (
         <ScrollToTop />
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/signup" element={<Signup />} />
           <Route element={<RequireAuth />}>
             <Route path="/dashboard" element={<Dashboard />} />
