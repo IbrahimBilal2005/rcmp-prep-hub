@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
-import { modules } from "@/data/courseData";
 import {
   FREE_PREVIEW_MODULE_ID,
   canAccessModule,
@@ -26,6 +25,8 @@ import {
   isPreviewModuleQuizQuestionUnlocked,
 } from "@/lib/access";
 import { getModuleProgress, isModuleFullyCompleted, upsertModuleProgress } from "@/lib/moduleProgressStorage";
+import { getEmptyCourseContent } from "@/services/content/service";
+import { useCourseContent } from "@/services/content/useCourseContent";
 
 const LockedMask = ({
   title,
@@ -54,6 +55,8 @@ const LockedMask = ({
 );
 
 const ModuleDetail = () => {
+  const { data: courseContent, isLoading } = useCourseContent();
+  const modules = (courseContent ?? getEmptyCourseContent()).modules;
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -95,6 +98,17 @@ const ModuleDetail = () => {
     );
     setQuizStarted(Boolean(progress?.quizStarted && !progress.quizCompleted));
   }, [moduleId, mod?.lessons.length, searchParams]);
+
+  if (isLoading && modules.length === 0) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-heading font-bold text-foreground mb-4">Loading module</h1>
+          <p className="text-muted-foreground">Fetching module content from Supabase.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!mod) {
     return (

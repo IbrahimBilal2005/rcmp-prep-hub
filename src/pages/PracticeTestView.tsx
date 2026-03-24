@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import BrandLockup from "@/components/brand/BrandLockup";
 import { Button } from "@/components/ui/button";
-import { practiceTests } from "@/data/courseData";
 import {
   FREE_PREVIEW_TEST_ID,
   canViewDetailedAnswerFeedback,
@@ -29,6 +28,8 @@ import {
   savePracticeAttempt,
   type PracticeAttemptRecord,
 } from "@/lib/practiceTestStorage";
+import { getEmptyCourseContent } from "@/services/content/service";
+import { useCourseContent } from "@/services/content/useCourseContent";
 
 const formatClock = (seconds: number) => {
   const mins = Math.floor(seconds / 60);
@@ -159,6 +160,8 @@ const ProgressPanel = ({
 };
 
 const PracticeTestView = () => {
+  const { data: courseContent, isLoading } = useCourseContent();
+  const practiceTests = (courseContent ?? getEmptyCourseContent()).practiceTests;
   const { id } = useParams();
   const test = practiceTests.find((item) => item.id === id);
   const locked = test ? !canAccessTest(test.id) : false;
@@ -243,6 +246,17 @@ const PracticeTestView = () => {
     });
     setAttemptHistory(getPracticeAttempts(test.id));
   }, [answers, durationSeconds, percentage, phase, reviewMeta, score, startedAt, test, totalQuestions]);
+
+  if (isLoading && practiceTests.length === 0) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-heading font-bold text-foreground mb-4">Loading test</h1>
+          <p className="text-muted-foreground">Fetching practice test content from Supabase.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!test) {
     return (

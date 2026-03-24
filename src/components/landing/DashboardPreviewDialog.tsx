@@ -10,13 +10,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { modules, practiceTests } from "@/data/courseData";
+import { getEmptyCourseContent } from "@/services/content/service";
+import { useCourseContent } from "@/services/content/useCourseContent";
 
 interface DashboardPreviewDialogProps {
   children: ReactNode;
 }
 
 const DashboardPreviewDialog = ({ children }: DashboardPreviewDialogProps) => {
+  const { data: courseContent } = useCourseContent();
+  const resolvedCourseContent = courseContent ?? getEmptyCourseContent();
+  const modules = resolvedCourseContent.modules;
+  const practiceTests = resolvedCourseContent.practiceTests;
   const featuredModule = modules[1];
   const modulePreviewLessons = featuredModule?.lessons.slice(0, 3) ?? [];
   const featuredTest = practiceTests[0];

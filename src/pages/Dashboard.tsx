@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
-import { modules, practiceTests } from "@/data/courseData";
 import { FREE_PREVIEW_MODULE_ID, FREE_PREVIEW_TEST_ID, canAccessModule, canAccessTest, isFreePreviewMode } from "@/lib/access";
 import { getAllModuleProgress, isModuleFullyCompleted } from "@/lib/moduleProgressStorage";
 import {
@@ -26,6 +25,8 @@ import {
   getPracticeAttempts,
   getTotalPracticeAttempts,
 } from "@/lib/practiceTestStorage";
+import { getEmptyCourseContent } from "@/services/content/service";
+import { useCourseContent } from "@/services/content/useCourseContent";
 
 type Tab = "modules" | "tests";
 
@@ -64,11 +65,21 @@ const getResumeLessonIndex = (lessonCount: number, completedLessons: number, las
 };
 
 const Dashboard = () => {
+  const { data: courseContent, isLoading } = useCourseContent();
+  const resolvedCourseContent = courseContent ?? getEmptyCourseContent();
+  const modules = resolvedCourseContent.modules;
+  const practiceTests = resolvedCourseContent.practiceTests;
+  const contentError = resolvedCourseContent.error;
   const [activeTab, setActiveTab] = useState<Tab>("modules");
   const [testMeta, setTestMeta] = useState<Record<string, TestCardMeta>>({});
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (practiceTests.length === 0) {
+      setTestMeta({});
+      return;
+    }
+
     const nextMeta = Object.fromEntries(
       practiceTests.map((test) => {
         const attempts = getPracticeAttempts(test.id);
@@ -85,7 +96,45 @@ const Dashboard = () => {
     );
 
     setTestMeta(nextMeta);
-  }, []);
+  }, [practiceTests]);
+
+  if (isLoading && (modules.length === 0 || practiceTests.length === 0)) {
+    return (
+      <div className="min-h-screen bg-background">
+        <DashboardHeader />
+        <div className="container mx-auto px-4 py-20">
+          <div className="glass-card mx-auto max-w-2xl rounded-3xl p-8 text-center">
+            <h1 className="font-heading text-2xl font-semibold text-foreground">Loading dashboard content</h1>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              Pulling modules, lessons, and practice tests from Supabase.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (modules.length === 0 || practiceTests.length === 0) {
+    return (
+      <div className="min-h-screen bg-background">
+        <DashboardHeader />
+        <div className="container mx-auto px-4 py-20">
+          <div className="glass-card mx-auto max-w-2xl rounded-3xl p-8 text-center">
+            <h1 className="font-heading text-2xl font-semibold text-foreground">No course content found</h1>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              Supabase did not return the training metadata yet. Recheck your content tables, seed data, and read policies.
+            </p>
+            {contentError ? (
+              <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-left text-sm text-red-700">
+                <p className="font-semibold">Supabase error</p>
+                <p className="mt-1 break-words">{contentError}</p>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const moduleProgress = getAllModuleProgress();
   const accessibleModules = modules.filter((mod) => canAccessModule(mod.id));

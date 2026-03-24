@@ -4,16 +4,33 @@ import { motion } from "framer-motion";
 import { ArrowLeft, CheckCircle2, Circle, PlayCircle } from "lucide-react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { Button } from "@/components/ui/button";
-import { modules } from "@/data/courseData";
 import { canAccessModule, isPreviewLessonUnlocked } from "@/lib/access";
 import { getModuleProgress, upsertModuleProgress } from "@/lib/moduleProgressStorage";
+import { getEmptyCourseContent } from "@/services/content/service";
+import { useCourseContent } from "@/services/content/useCourseContent";
 
 const LessonView = () => {
+  const { data: courseContent, isLoading } = useCourseContent();
+  const modules = (courseContent ?? getEmptyCourseContent()).modules;
   const { id, lessonIndex } = useParams();
   const moduleId = Number(id);
   const lessonNumber = Number(lessonIndex);
   const mod = modules.find((entry) => entry.id === moduleId);
   const [completedLessons, setCompletedLessons] = useState<number[]>([]);
+
+  if (isLoading && modules.length === 0) {
+    return (
+      <div className="min-h-screen bg-background">
+        <DashboardHeader />
+        <div className="container mx-auto max-w-5xl px-4 py-10">
+          <div className="text-center">
+            <h1 className="text-2xl font-heading font-bold text-foreground mb-4">Loading lesson</h1>
+            <p className="text-muted-foreground">Fetching lesson content from Supabase.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!mod) {
     return (

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -35,9 +35,11 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { modules, practiceTests, type ModuleInfo, type ModuleLesson, type PracticeTest, type QuizQuestion } from "@/data/courseData";
+import type { ModuleInfo, ModuleLesson, PracticeTest, QuizQuestion } from "@/data/courseData";
 import { clearAuthSession } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { getEmptyCourseContent } from "@/services/content/service";
+import { useCourseContent } from "@/services/content/useCourseContent";
 
 type AdminTab = "modules" | "tests" | "users";
 type UserStatus = "active" | "invited" | "suspended";
@@ -62,14 +64,14 @@ const cloneLesson = (lesson: ModuleLesson): ModuleLesson => ({
   ...lesson,
 });
 
-const createModuleDrafts = (): ModuleInfo[] =>
+const createModuleDrafts = (modules: ModuleInfo[]): ModuleInfo[] =>
   modules.map((module) => ({
     ...module,
     lessons: module.lessons.map(cloneLesson),
     quiz: module.quiz.map(cloneQuestion),
   }));
 
-const createTestDrafts = (): PracticeTest[] =>
+const createTestDrafts = (practiceTests: PracticeTest[]): PracticeTest[] =>
   practiceTests.map((test) => ({
     ...test,
     testQuestions: test.testQuestions.map(cloneQuestion),
@@ -149,10 +151,14 @@ const createNewQuestionDraft = (): QuizQuestion => ({
 });
 
 const AdminDashboard = () => {
+  const { data: courseContent } = useCourseContent();
+  const resolvedCourseContent = courseContent ?? getEmptyCourseContent();
+  const modules = resolvedCourseContent.modules;
+  const practiceTests = resolvedCourseContent.practiceTests;
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<AdminTab>("modules");
-  const [moduleDrafts, setModuleDrafts] = useState<ModuleInfo[]>(() => createModuleDrafts());
-  const [testDrafts, setTestDrafts] = useState<PracticeTest[]>(() => createTestDrafts());
+  const [moduleDrafts, setModuleDrafts] = useState<ModuleInfo[]>(() => createModuleDrafts(modules));
+  const [testDrafts, setTestDrafts] = useState<PracticeTest[]>(() => createTestDrafts(practiceTests));
   const [userRecords, setUserRecords] = useState<AdminUser[]>(initialUsers);
   const [selectedModuleId, setSelectedModuleId] = useState<number>(modules[0]?.id ?? 1);
   const [selectedTestId, setSelectedTestId] = useState<string>(practiceTests[0]?.id ?? "numerical");
@@ -167,6 +173,28 @@ const AdminDashboard = () => {
   const [newModuleQuestionDraft, setNewModuleQuestionDraft] = useState<QuizQuestion>(() => createNewQuestionDraft());
   const [newTestDraft, setNewTestDraft] = useState({ title: "", description: "", category: "General", time: 15 });
   const [newTestQuestionDraft, setNewTestQuestionDraft] = useState<QuizQuestion>(() => createNewQuestionDraft());
+
+  useEffect(() => {
+    setModuleDrafts(createModuleDrafts(modules));
+    setTestDrafts(createTestDrafts(practiceTests));
+    setSelectedModuleId((current) => modules.find((module) => module.id === current)?.id ?? modules[0]?.id ?? 1);
+    setSelectedTestId((current) => practiceTests.find((test) => test.id === current)?.id ?? practiceTests[0]?.id ?? "numerical");
+  }, [modules, practiceTests]);
+
+  if (moduleDrafts.length === 0 || testDrafts.length === 0) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="mx-auto max-w-5xl px-4 py-12">
+          <div className="glass-card rounded-3xl p-8 text-center">
+            <h1 className="font-heading text-3xl font-bold text-foreground">Admin Content Loading</h1>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              Waiting for modules and practice tests from Supabase before opening the admin workspace.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const selectedModule = moduleDrafts.find((module) => module.id === selectedModuleId) ?? moduleDrafts[0];
 
