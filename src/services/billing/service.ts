@@ -1,31 +1,52 @@
 import { appConfig } from "@/config/app";
 import type { AccountPlan, AuthSession } from "@/services/auth/types";
+import { supabase } from "@/services/supabase/client";
 
 export interface BillingResult {
   status: "activated" | "redirected";
 }
 
-const buildCheckoutUrl = (session: AuthSession) => {
-  if (!appConfig.stripeCheckoutUrl) {
-    return null;
-  }
-
-  const url = new URL(appConfig.stripeCheckoutUrl);
-  url.searchParams.set("prefilled_email", session.email);
-  url.searchParams.set("client_reference_id", session.email);
-  return url.toString();
-};
-
 export const activatePlan = async (plan: AccountPlan, session: AuthSession): Promise<BillingResult> => {
-  if (plan === "free" || appConfig.useMockBilling) {
+  if (plan === "free") {
     return { status: "activated" };
   }
 
-  const checkoutUrl = buildCheckoutUrl(session);
-  if (!checkoutUrl) {
-    throw new Error("Stripe checkout is not configured yet. Set VITE_STRIPE_CHECKOUT_URL or enable mock billing.");
+  if (appConfig.useMockBilling) {
+    throw new Error("Premium checkout is not available until Stripe billing is configured.");
   }
 
-  window.location.assign(checkoutUrl);
+  if (!supabase) {
+    throw new Error("Supabase is not configured for Stripe checkout.");
+  }
+
+  if (!appConfig.stripePriceSixMonthAccess) {
+    throw new Error("Stripe price is not configured yet. Set VITE_STRIPE_PRICE_6_MONTHS.");
+  }
+
+  const { data: authData, error: authError } = await supabase.auth.getSession();
+  if (authError) {
+    throw new Error(authError.message);
+  }
+
+  if (!authData.session?.access_token) {
+    throw new Error("You need an active signed-in session before starting checkout. Log in and try again.");
+  }
+
+  const { data, error } = await supabase.functions.invoke("create-checkout-session", {
+    body: {
+      priceId: appConfig.stripePriceSixMonthAccess,
+      plan,
+      userId: session.id,
+      email: session.email,
+    },
+  });
+
+  const payload = data as { url?: string; error?: string } | null;
+
+  if (error || !payload?.url) {
+    throw new Error(payload?.error || error?.message || "Unable to create Stripe checkout session.");
+  }
+
+  window.location.assign(payload.url);
   return { status: "redirected" };
 };

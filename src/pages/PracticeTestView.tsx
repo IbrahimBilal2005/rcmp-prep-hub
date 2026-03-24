@@ -30,6 +30,7 @@ import {
 } from "@/lib/practiceTestStorage";
 import { getEmptyCourseContent } from "@/services/content/service";
 import { useCourseContent } from "@/services/content/useCourseContent";
+import { persistPracticeAttempt } from "@/services/progress/supabase-sync";
 
 const formatClock = (seconds: number) => {
   const mins = Math.floor(seconds / 60);
@@ -233,6 +234,18 @@ const PracticeTestView = () => {
 
     persistedAttemptIdRef.current = attemptId;
     savePracticeAttempt({
+      id: attemptId,
+      testId: test.id,
+      score,
+      totalQuestions,
+      percentage,
+      startedAt,
+      completedAt: reviewMeta.completedAt,
+      durationSeconds,
+      timedOut: reviewMeta.timedOut,
+      answers,
+    });
+    void persistPracticeAttempt({
       id: attemptId,
       testId: test.id,
       score,

@@ -1,0 +1,467 @@
+import type { ModuleInfo, ModuleLesson, PracticeTest, QuizQuestion } from "@/data/courseData";
+import { supabase } from "@/services/supabase/client";
+
+export type AdminUserStatus = "active" | "invited" | "suspended";
+
+export interface AdminUserRecord {
+  id: string;
+  name: string;
+  email: string;
+  plan: "free" | "premium";
+  status: AdminUserStatus;
+  modulesCompleted: number;
+  testAttempts: number;
+  lastSeen: string;
+}
+
+interface ProfileRow {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  role: "user" | "admin" | null;
+  plan: "free" | "premium" | null;
+  status: AdminUserStatus | null;
+  created_at: string | null;
+}
+
+interface ModuleProgressRow {
+  user_id: string;
+  completed_lessons: number;
+  lessons_total: number;
+  updated_at: string;
+}
+
+interface PracticeAttemptRow {
+  user_id: string;
+  submitted_at: string;
+}
+
+const requireSupabase = () => {
+  if (!supabase) {
+    throw new Error("Supabase client is not initialized.");
+  }
+
+  return supabase;
+};
+
+const slugify = (value: string) =>
+  value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+const parseDurationMinutes = (duration: string) => {
+  const minutes = Number.parseInt(duration, 10);
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : 10;
+};
+
+const formatLastSeen = (dateString: string | null) => {
+  if (!dateString) {
+    return "No activity yet";
+  }
+
+  return new Intl.DateTimeFormat("en-CA", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(dateString));
+};
+
+const getLatestTimestamp = (...timestamps: Array<string | null | undefined>) =>
+  timestamps
+    .filter((value): value is string => Boolean(value))
+    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] ?? null;
+
+const getNextSortOrder = async (
+  table: "modules" | "practice_tests" | "lessons" | "module_quiz_questions" | "practice_test_questions",
+  filterColumn?: string,
+  filterValue?: number,
+) => {
+  const client = requireSupabase();
+  let query = client.from(table).select("sort_order").order("sort_order", { ascending: false }).limit(1);
+
+  if (filterColumn && typeof filterValue === "number") {
+    query = query.eq(filterColumn, filterValue);
+  }
+
+  const { data, error } = await query.maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data?.sort_order ?? -1) + 1;
+};
+
+export const fetchAdminUsers = async (): Promise<AdminUserRecord[]> => {
+  const client = requireSupabase();
+  const [{ data: profiles, error: profileError }, { data: moduleProgress, error: moduleProgressError }, { data: attempts, error: attemptError }] =
+    await Promise.all([
+      client.from("profiles").select("id, email, full_name, role, plan, status, created_at").order("created_at", { ascending: true }),
+      client.from("user_module_progress").select("user_id, completed_lessons, lessons_total, updated_at"),
+      client.from("practice_test_attempts").select("user_id, submitted_at"),
+    ]);
+
+  if (profileError) {
+    throw new Error(profileError.message || "Failed to load admin users.");
+  }
+
+  const progressByUser = new Map<string, ModuleProgressRow[]>();
+  (moduleProgressError ? [] : (moduleProgress as ModuleProgressRow[])).forEach((row) => {
+    const next = progressByUser.get(row.user_id) ?? [];
+    next.push(row);
+    progressByUser.set(row.user_id, next);
+  });
+
+  const attemptsByUser = new Map<string, PracticeAttemptRow[]>();
+  (attemptError ? [] : (attempts as PracticeAttemptRow[])).forEach((row) => {
+    const next = attemptsByUser.get(row.user_id) ?? [];
+    next.push(row);
+    attemptsByUser.set(row.user_id, next);
+  });
+
+  return (profiles as ProfileRow[])
+    .filter((profile) => profile.role !== "admin")
+    .map((profile) => {
+      const userProgress = progressByUser.get(profile.id) ?? [];
+      const userAttempts = attemptsByUser.get(profile.id) ?? [];
+      const completedModules = userProgress.filter(
+        (row) => row.lessons_total > 0 && row.completed_lessons >= row.lessons_total,
+      ).length;
+      const latestActivity = getLatestTimestamp(
+        profile.created_at,
+        ...userProgress.map((row) => row.updated_at),
+        ...userAttempts.map((row) => row.submitted_at),
+      );
+
+      return {
+        id: profile.id,
+        name: profile.full_name?.trim() || "AptitudeForge User",
+        email: profile.email?.trim() || "No email",
+        plan: profile.plan === "premium" ? "premium" : "free",
+        status: profile.status ?? "active",
+        modulesCompleted: completedModules,
+        testAttempts: userAttempts.length,
+        lastSeen: formatLastSeen(latestActivity),
+      };
+    });
+};
+
+export const createModule = async (draft: { title: string; description: string }) => {
+  const client = requireSupabase();
+  const sortOrder = await getNextSortOrder("modules");
+  const baseSlug = slugify(draft.title) || `module-${Date.now()}`;
+  const slug = `${baseSlug}-${Date.now().toString().slice(-6)}`;
+  const { error } = await client.from("modules").insert({
+    slug,
+    title: draft.title.trim() || "New Module",
+    description: draft.description.trim() || "Add a focused module description for the training dashboard.",
+    sort_order: sortOrder,
+    is_published: true,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+export const updateModule = async (moduleId: number, patch: Partial<ModuleInfo>) => {
+  const client = requireSupabase();
+  const updates: Record<string, string> = {};
+
+  if (typeof patch.title === "string") {
+    updates.title = patch.title.trim();
+  }
+
+  if (typeof patch.description === "string") {
+    updates.description = patch.description.trim();
+  }
+
+  const { error } = await client.from("modules").update(updates).eq("id", moduleId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+export const deleteModule = async (moduleId: number) => {
+  const client = requireSupabase();
+  const { error } = await client.from("modules").delete().eq("id", moduleId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+export const createLesson = async (moduleId: number, draft: ModuleLesson) => {
+  const client = requireSupabase();
+  const sortOrder = await getNextSortOrder("lessons", "module_id", moduleId);
+  const { error } = await client.from("lessons").insert({
+    module_id: moduleId,
+    title: draft.title.trim() || "New Lesson",
+    chapter_label: draft.chapterLabel.trim() || null,
+    summary: draft.summary.trim() || "Add the lesson overview and outcomes.",
+    duration_minutes: parseDurationMinutes(draft.duration),
+    sort_order: sortOrder,
+    video_path: draft.videoUrl?.trim() || null,
+    poster_path: draft.posterUrl?.trim() || null,
+    is_preview: false,
+    is_published: true,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+export const updateLesson = async (lessonId: number, patch: Partial<ModuleLesson>) => {
+  const client = requireSupabase();
+  const updates: Record<string, string | number | null> = {};
+
+  if (typeof patch.title === "string") {
+    updates.title = patch.title.trim();
+  }
+
+  if (typeof patch.duration === "string") {
+    updates.duration_minutes = parseDurationMinutes(patch.duration);
+  }
+
+  if (typeof patch.summary === "string") {
+    updates.summary = patch.summary.trim();
+  }
+
+  if (typeof patch.chapterLabel === "string") {
+    updates.chapter_label = patch.chapterLabel.trim() || null;
+  }
+
+  if ("videoUrl" in patch) {
+    updates.video_path = patch.videoUrl?.trim() || null;
+  }
+
+  if ("posterUrl" in patch) {
+    updates.poster_path = patch.posterUrl?.trim() || null;
+  }
+
+  const { error } = await client.from("lessons").update(updates).eq("id", lessonId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+export const deleteLesson = async (lessonId: number) => {
+  const client = requireSupabase();
+  const { error } = await client.from("lessons").delete().eq("id", lessonId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+export const createModuleQuestion = async (moduleId: number, draft: QuizQuestion) => {
+  const client = requireSupabase();
+  const sortOrder = await getNextSortOrder("module_quiz_questions", "module_id", moduleId);
+  const { error } = await client.from("module_quiz_questions").insert({
+    module_id: moduleId,
+    question: draft.question.trim() || "Add a new question prompt.",
+    options: draft.options,
+    correct_index: draft.correctIndex,
+    explanation: draft.explanation.trim() || "Add the explanation for this question.",
+    sort_order: sortOrder,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+export const updateModuleQuestion = async (questionId: number, patch: Partial<QuizQuestion>) => {
+  const client = requireSupabase();
+  const updates: Record<string, string | number | string[]> = {};
+
+  if (typeof patch.question === "string") {
+    updates.question = patch.question.trim();
+  }
+
+  if (Array.isArray(patch.options)) {
+    updates.options = patch.options;
+  }
+
+  if (typeof patch.correctIndex === "number") {
+    updates.correct_index = patch.correctIndex;
+  }
+
+  if (typeof patch.explanation === "string") {
+    updates.explanation = patch.explanation.trim();
+  }
+
+  const { error } = await client.from("module_quiz_questions").update(updates).eq("id", questionId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+export const deleteModuleQuestion = async (questionId: number) => {
+  const client = requireSupabase();
+  const { error } = await client.from("module_quiz_questions").delete().eq("id", questionId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+export const createPracticeTest = async (draft: { title: string; description: string; category: string; time: number }) => {
+  const client = requireSupabase();
+  const sortOrder = await getNextSortOrder("practice_tests");
+  const baseSlug = slugify(draft.title) || `practice-test-${Date.now()}`;
+  const slug = `${baseSlug}-${Date.now().toString().slice(-6)}`;
+  const { error } = await client.from("practice_tests").insert({
+    slug,
+    title: draft.title.trim() || "New Practice Test",
+    description: draft.description.trim() || "Add the test overview, timing goals, and what this set is designed to measure.",
+    category: draft.category.trim() || "General",
+    time_limit_minutes: draft.time,
+    sort_order: sortOrder,
+    is_preview: false,
+    is_published: true,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+export const updatePracticeTest = async (testId: number, patch: Partial<PracticeTest>) => {
+  const client = requireSupabase();
+  const updates: Record<string, string | number> = {};
+
+  if (typeof patch.title === "string") {
+    updates.title = patch.title.trim();
+  }
+
+  if (typeof patch.description === "string") {
+    updates.description = patch.description.trim();
+  }
+
+  if (typeof patch.category === "string") {
+    updates.category = patch.category.trim();
+  }
+
+  if (typeof patch.time === "number") {
+    updates.time_limit_minutes = patch.time;
+  }
+
+  const { error } = await client.from("practice_tests").update(updates).eq("id", testId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+export const deletePracticeTest = async (testId: number) => {
+  const client = requireSupabase();
+  const { error } = await client.from("practice_tests").delete().eq("id", testId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+export const createPracticeTestQuestion = async (testId: number, draft: QuizQuestion) => {
+  const client = requireSupabase();
+  const sortOrder = await getNextSortOrder("practice_test_questions", "practice_test_id", testId);
+  const { error } = await client.from("practice_test_questions").insert({
+    practice_test_id: testId,
+    question: draft.question.trim() || "Add a new question prompt.",
+    options: draft.options,
+    correct_index: draft.correctIndex,
+    explanation: draft.explanation.trim() || "Add the explanation for this question.",
+    sort_order: sortOrder,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+export const updatePracticeTestQuestion = async (questionId: number, patch: Partial<QuizQuestion>) => {
+  const client = requireSupabase();
+  const updates: Record<string, string | number | string[]> = {};
+
+  if (typeof patch.question === "string") {
+    updates.question = patch.question.trim();
+  }
+
+  if (Array.isArray(patch.options)) {
+    updates.options = patch.options;
+  }
+
+  if (typeof patch.correctIndex === "number") {
+    updates.correct_index = patch.correctIndex;
+  }
+
+  if (typeof patch.explanation === "string") {
+    updates.explanation = patch.explanation.trim();
+  }
+
+  const { error } = await client.from("practice_test_questions").update(updates).eq("id", questionId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+export const deletePracticeTestQuestion = async (questionId: number) => {
+  const client = requireSupabase();
+  const { error } = await client.from("practice_test_questions").delete().eq("id", questionId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+export const updateAdminUser = async (
+  userId: string,
+  patch: Partial<Pick<AdminUserRecord, "plan" | "status">>,
+) => {
+  const client = requireSupabase();
+  const updates: Record<string, string | null> = {};
+
+  if (patch.plan) {
+    updates.plan = patch.plan;
+    if (patch.plan === "premium") {
+      const accessExpiresAt = new Date();
+      accessExpiresAt.setUTCMonth(accessExpiresAt.getUTCMonth() + 6);
+      updates.access_expires_at = accessExpiresAt.toISOString();
+    }
+
+    if (patch.plan === "free") {
+      updates.access_expires_at = null;
+    }
+  }
+
+  if (patch.status) {
+    updates.status = patch.status;
+  }
+
+  const { error } = await client.from("profiles").update(updates).eq("id", userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+export const deleteAdminUser = async (userId: string) => {
+  const client = requireSupabase();
+  const { error } = await client.functions.invoke("admin-delete-user", {
+    body: { userId },
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};

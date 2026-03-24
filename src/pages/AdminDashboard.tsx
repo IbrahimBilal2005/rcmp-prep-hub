@@ -1,16 +1,16 @@
 import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   BookOpen,
   Crown,
+  CheckCircle2,
   FileText,
   Layers3,
-  Mail,
   Pencil,
   Plus,
   ShieldCheck,
-  Sparkles,
   Target,
   Trash2,
   Users,
@@ -34,26 +34,39 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/components/ui/use-toast";
 import type { ModuleInfo, ModuleLesson, PracticeTest, QuizQuestion } from "@/data/courseData";
 import { clearAuthSession } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import {
+  createLesson,
+  createModule,
+  createModuleQuestion,
+  createPracticeTest,
+  createPracticeTestQuestion,
+  deleteAdminUser,
+  deleteLesson as deleteLessonRecord,
+  deleteModule as deleteModuleRecord,
+  deleteModuleQuestion as deleteModuleQuestionRecord,
+  deletePracticeTest as deletePracticeTestRecord,
+  deletePracticeTestQuestion as deletePracticeTestQuestionRecord,
+  fetchAdminUsers,
+  type AdminUserRecord,
+  type AdminUserStatus,
+  updateAdminUser,
+  updateLesson as updateLessonRecord,
+  updateModule as updateModuleRecord,
+  updateModuleQuestion as updateModuleQuestionRecord,
+  updatePracticeTest as updatePracticeTestRecord,
+  updatePracticeTestQuestion as updatePracticeTestQuestionRecord,
+} from "@/services/admin/service";
 import { getEmptyCourseContent } from "@/services/content/service";
 import { useCourseContent } from "@/services/content/useCourseContent";
+import { removeLessonAsset, uploadLessonAsset, validateLessonAssetFile } from "@/services/storage/lesson-assets";
 
 type AdminTab = "modules" | "tests" | "users";
-type UserStatus = "active" | "invited" | "suspended";
-
-interface AdminUser {
-  id: string;
-  name: string;
-  email: string;
-  plan: "free" | "premium";
-  status: UserStatus;
-  modulesCompleted: number;
-  testAttempts: number;
-  lastSeen: string;
-}
 
 const cloneQuestion = (question: QuizQuestion): QuizQuestion => ({
   ...question,
@@ -77,52 +90,9 @@ const createTestDrafts = (practiceTests: PracticeTest[]): PracticeTest[] =>
     testQuestions: test.testQuestions.map(cloneQuestion),
   }));
 
-const initialUsers: AdminUser[] = [
-  {
-    id: "user-1",
-    name: "Bilal Khan",
-    email: "bilal@example.com",
-    plan: "premium",
-    status: "active",
-    modulesCompleted: 5,
-    testAttempts: 11,
-    lastSeen: "Today, 9:42 AM",
-  },
-  {
-    id: "user-2",
-    name: "Sophie Martin",
-    email: "sophie@example.com",
-    plan: "free",
-    status: "active",
-    modulesCompleted: 1,
-    testAttempts: 2,
-    lastSeen: "Today, 7:18 AM",
-  },
-  {
-    id: "user-3",
-    name: "Ethan Wright",
-    email: "ethan@example.com",
-    plan: "premium",
-    status: "invited",
-    modulesCompleted: 0,
-    testAttempts: 0,
-    lastSeen: "Invitation pending",
-  },
-  {
-    id: "user-4",
-    name: "Maya Chen",
-    email: "maya@example.com",
-    plan: "premium",
-    status: "active",
-    modulesCompleted: 7,
-    testAttempts: 18,
-    lastSeen: "Yesterday, 6:07 PM",
-  },
-];
-
 const parseMinutes = (duration: string) => Number.parseInt(duration, 10) || 0;
 
-const statusTone: Record<UserStatus, string> = {
+const statusTone: Record<AdminUserStatus, string> = {
   active: "bg-emerald-50 text-emerald-700 border-emerald-200",
   invited: "bg-amber-50 text-amber-700 border-amber-200",
   suspended: "bg-red-50 text-red-600 border-red-200",
@@ -151,7 +121,13 @@ const createNewQuestionDraft = (): QuizQuestion => ({
 });
 
 const AdminDashboard = () => {
+  const queryClient = useQueryClient();
   const { data: courseContent } = useCourseContent();
+  const { data: adminUsers = [] } = useQuery({
+    queryKey: ["admin-users"],
+    queryFn: fetchAdminUsers,
+    staleTime: 60_000,
+  });
   const resolvedCourseContent = courseContent ?? getEmptyCourseContent();
   const modules = resolvedCourseContent.modules;
   const practiceTests = resolvedCourseContent.practiceTests;
@@ -159,10 +135,10 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState<AdminTab>("modules");
   const [moduleDrafts, setModuleDrafts] = useState<ModuleInfo[]>(() => createModuleDrafts(modules));
   const [testDrafts, setTestDrafts] = useState<PracticeTest[]>(() => createTestDrafts(practiceTests));
-  const [userRecords, setUserRecords] = useState<AdminUser[]>(initialUsers);
+  const [userRecords, setUserRecords] = useState<AdminUserRecord[]>(adminUsers);
   const [selectedModuleId, setSelectedModuleId] = useState<number>(modules[0]?.id ?? 1);
   const [selectedTestId, setSelectedTestId] = useState<string>(practiceTests[0]?.id ?? "numerical");
-  const [selectedUserId, setSelectedUserId] = useState<string>(initialUsers[0]?.id ?? "");
+  const [selectedUserId, setSelectedUserId] = useState<string>(adminUsers[0]?.id ?? "");
   const [createModuleOpen, setCreateModuleOpen] = useState(false);
   const [createLessonOpen, setCreateLessonOpen] = useState(false);
   const [createModuleQuestionOpen, setCreateModuleQuestionOpen] = useState(false);
@@ -173,6 +149,137 @@ const AdminDashboard = () => {
   const [newModuleQuestionDraft, setNewModuleQuestionDraft] = useState<QuizQuestion>(() => createNewQuestionDraft());
   const [newTestDraft, setNewTestDraft] = useState({ title: "", description: "", category: "General", time: 15 });
   const [newTestQuestionDraft, setNewTestQuestionDraft] = useState<QuizQuestion>(() => createNewQuestionDraft());
+  const [uploadingAssetKey, setUploadingAssetKey] = useState<string | null>(null);
+  const [uploadedAssetLabels, setUploadedAssetLabels] = useState<Record<string, string>>({});
+  const [assetStatusText, setAssetStatusText] = useState<Record<string, string>>({});
+
+  const refreshCourseContent = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["course-content"] });
+    await queryClient.refetchQueries({ queryKey: ["course-content"] });
+  };
+
+  const refreshUsers = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+    await queryClient.refetchQueries({ queryKey: ["admin-users"] });
+  };
+
+  const showMutationError = (title: string, error: unknown) => {
+    toast({
+      title,
+      description: error instanceof Error ? error.message : "Something went wrong while saving to Supabase.",
+      variant: "destructive",
+    });
+  };
+
+  const handleLessonAssetUpload = async (
+    lessonIndex: number,
+    kind: "video" | "poster",
+    file: File | null,
+  ) => {
+    if (!file) {
+      return;
+    }
+
+    const lesson = selectedModule.lessons[lessonIndex];
+
+    if (!lesson?.id) {
+      showMutationError("Unable to upload file", new Error("Create the lecture first so it has a database id."));
+      return;
+    }
+
+    const assetKey = `${lesson.id}-${kind}`;
+    setUploadingAssetKey(assetKey);
+    setAssetStatusText((current) => ({
+      ...current,
+      [assetKey]: "Uploading to Supabase Storage...",
+    }));
+
+    try {
+      validateLessonAssetFile(kind, file);
+      await uploadLessonAsset({
+        moduleId: selectedModule.id,
+        lessonId: lesson.id,
+        file,
+        kind,
+        previousPath: kind === "video" ? lesson.videoUrl : lesson.posterUrl,
+      });
+      setUploadedAssetLabels((current) => ({
+        ...current,
+        [assetKey]: file.name,
+      }));
+      setAssetStatusText((current) => ({
+        ...current,
+        [assetKey]: "Upload complete",
+      }));
+      setUploadingAssetKey(null);
+      void refreshCourseContent();
+      toast({
+        title: kind === "video" ? "Video uploaded" : "Poster uploaded",
+        description: `${file.name} was uploaded to Supabase Storage and linked to this lecture.`,
+      });
+    } catch (error) {
+      setAssetStatusText((current) => ({
+        ...current,
+        [assetKey]: error instanceof Error ? error.message : "Upload failed",
+      }));
+      showMutationError(`Unable to upload ${kind}`, error);
+    } finally {
+      setUploadingAssetKey((current) => (current === assetKey ? null : current));
+    }
+  };
+
+  const handleRemoveLessonAsset = async (lessonIndex: number, kind: "video" | "poster") => {
+    const lesson = selectedModule.lessons[lessonIndex];
+
+    if (!lesson?.id) {
+      showMutationError("Unable to remove file", new Error("This lecture is missing its database id."));
+      return;
+    }
+
+    const assetKey = `${lesson.id}-${kind}`;
+    const currentPath = kind === "video" ? lesson.videoUrl : lesson.posterUrl;
+
+    if (!currentPath) {
+      return;
+    }
+
+    setUploadingAssetKey(assetKey);
+    setAssetStatusText((current) => ({
+      ...current,
+      [assetKey]: "Removing linked file...",
+    }));
+
+    try {
+      await removeLessonAsset({
+        lessonId: lesson.id,
+        kind,
+        currentPath,
+      });
+      setUploadedAssetLabels((current) => {
+        const next = { ...current };
+        delete next[assetKey];
+        return next;
+      });
+      setAssetStatusText((current) => ({
+        ...current,
+        [assetKey]: "File removed",
+      }));
+      setUploadingAssetKey(null);
+      void refreshCourseContent();
+      toast({
+        title: kind === "video" ? "Video removed" : "Poster removed",
+        description: "The linked file was removed from Supabase Storage and the lesson record.",
+      });
+    } catch (error) {
+      setAssetStatusText((current) => ({
+        ...current,
+        [assetKey]: error instanceof Error ? error.message : "Removal failed",
+      }));
+      showMutationError(`Unable to remove ${kind}`, error);
+    } finally {
+      setUploadingAssetKey((current) => (current === assetKey ? null : current));
+    }
+  };
 
   useEffect(() => {
     setModuleDrafts(createModuleDrafts(modules));
@@ -180,6 +287,11 @@ const AdminDashboard = () => {
     setSelectedModuleId((current) => modules.find((module) => module.id === current)?.id ?? modules[0]?.id ?? 1);
     setSelectedTestId((current) => practiceTests.find((test) => test.id === current)?.id ?? practiceTests[0]?.id ?? "numerical");
   }, [modules, practiceTests]);
+
+  useEffect(() => {
+    setUserRecords(adminUsers);
+    setSelectedUserId((current) => adminUsers.find((user) => user.id === current)?.id ?? adminUsers[0]?.id ?? "");
+  }, [adminUsers]);
 
   if (moduleDrafts.length === 0 || testDrafts.length === 0) {
     return (
@@ -240,42 +352,88 @@ const AdminDashboard = () => {
     updateModuleQuestion(questionIndex, { options: nextOptions });
   };
 
-  const addModule = () => {
-    const nextId = Math.max(...moduleDrafts.map((module) => module.id), 0) + 1;
-    const nextModule: ModuleInfo = {
-      id: nextId,
-      icon: BookOpen,
-      title: newModuleDraft.title.trim() || `New Module ${nextId}`,
-      description: newModuleDraft.description.trim() || "Add a focused module description for the training dashboard.",
-      lessons: [],
-      quiz: [],
-    };
-
-    setModuleDrafts((current) => [...current, nextModule]);
-    setSelectedModuleId(nextId);
-    setActiveTab("modules");
-    setCreateModuleOpen(false);
-    setNewModuleDraft({ title: "", description: "" });
+  const addModule = async () => {
+    try {
+      await createModule(newModuleDraft);
+      await refreshCourseContent();
+      setActiveTab("modules");
+      setCreateModuleOpen(false);
+      setNewModuleDraft({ title: "", description: "" });
+      toast({ title: "Module created", description: "The new module was saved to Supabase." });
+    } catch (error) {
+      showMutationError("Unable to create module", error);
+    }
   };
 
-  const addLessonToSelectedModule = () => {
-    setModuleDrafts((current) =>
-      current.map((module) =>
-        module.id === selectedModule.id ? { ...module, lessons: [...module.lessons, newLessonDraft] } : module,
-      ),
-    );
-    setCreateLessonOpen(false);
-    setNewLessonDraft(createNewLessonDraft(selectedModule.lessons.length + 2));
+  const saveSelectedModule = async () => {
+    try {
+      await updateModuleRecord(selectedModule.id, {
+        title: selectedModule.title,
+        description: selectedModule.description,
+      });
+      await refreshCourseContent();
+      toast({ title: "Module updated", description: "Module details are now live in Supabase." });
+    } catch (error) {
+      showMutationError("Unable to update module", error);
+    }
   };
 
-  const addQuizQuestionToSelectedModule = () => {
-    setModuleDrafts((current) =>
-      current.map((module) =>
-        module.id === selectedModule.id ? { ...module, quiz: [...module.quiz, newModuleQuestionDraft] } : module,
-      ),
-    );
-    setCreateModuleQuestionOpen(false);
-    setNewModuleQuestionDraft(createNewQuestionDraft());
+  const addLessonToSelectedModule = async () => {
+    try {
+      await createLesson(selectedModule.id, newLessonDraft);
+      await refreshCourseContent();
+      setCreateLessonOpen(false);
+      setNewLessonDraft(createNewLessonDraft(selectedModule.lessons.length + 2));
+      toast({ title: "Lecture created", description: "The new lecture was added to this module." });
+    } catch (error) {
+      showMutationError("Unable to create lecture", error);
+    }
+  };
+
+  const saveLesson = async (lessonIndex: number) => {
+    const lesson = selectedModule.lessons[lessonIndex];
+
+    if (!lesson?.id) {
+      showMutationError("Unable to update lecture", new Error("This lecture is missing its database id."));
+      return;
+    }
+
+    try {
+      await updateLessonRecord(lesson.id, lesson);
+      await refreshCourseContent();
+      toast({ title: "Lecture updated", description: "Lecture changes were saved to Supabase." });
+    } catch (error) {
+      showMutationError("Unable to update lecture", error);
+    }
+  };
+
+  const addQuizQuestionToSelectedModule = async () => {
+    try {
+      await createModuleQuestion(selectedModule.id, newModuleQuestionDraft);
+      await refreshCourseContent();
+      setCreateModuleQuestionOpen(false);
+      setNewModuleQuestionDraft(createNewQuestionDraft());
+      toast({ title: "Question created", description: "The checkpoint question was added to the module quiz." });
+    } catch (error) {
+      showMutationError("Unable to create question", error);
+    }
+  };
+
+  const saveModuleQuestion = async (questionIndex: number) => {
+    const question = selectedModule.quiz[questionIndex];
+
+    if (!question?.id) {
+      showMutationError("Unable to update question", new Error("This question is missing its database id."));
+      return;
+    }
+
+    try {
+      await updateModuleQuestionRecord(question.id, question);
+      await refreshCourseContent();
+      toast({ title: "Question updated", description: "Module quiz changes were saved to Supabase." });
+    } catch (error) {
+      showMutationError("Unable to update question", error);
+    }
   };
 
   const updateSelectedTest = (patch: Partial<PracticeTest>) => {
@@ -305,113 +463,177 @@ const AdminDashboard = () => {
     updateTestQuestion(questionIndex, { options: nextOptions });
   };
 
-  const addTest = () => {
-    const nextTest: PracticeTest = {
-      id: `new-test-${testDrafts.length + 1}`,
-      title: newTestDraft.title.trim() || `New Practice Test ${testDrafts.length + 1}`,
-      description: newTestDraft.description.trim() || "Add the test overview, timing goals, and what this set is designed to measure.",
-      questions: 0,
-      time: newTestDraft.time,
-      category: newTestDraft.category.trim() || "General",
-      icon: FileText,
-      testQuestions: [],
-    };
+  const saveSelectedTest = async () => {
+    if (!selectedTest.dbId) {
+      showMutationError("Unable to update test", new Error("This test is missing its database id."));
+      return;
+    }
 
-    setTestDrafts((current) => [...current, nextTest]);
-    setSelectedTestId(nextTest.id);
-    setActiveTab("tests");
-    setCreateTestOpen(false);
-    setNewTestDraft({ title: "", description: "", category: "General", time: 15 });
+    try {
+      await updatePracticeTestRecord(selectedTest.dbId, {
+        title: selectedTest.title,
+        category: selectedTest.category,
+        description: selectedTest.description,
+        time: selectedTest.time,
+      });
+      await refreshCourseContent();
+      toast({ title: "Practice test updated", description: "Test settings were saved to Supabase." });
+    } catch (error) {
+      showMutationError("Unable to update test", error);
+    }
   };
 
-  const addQuestionToSelectedTest = () => {
-    setTestDrafts((current) =>
-      current.map((test) =>
-        test.id === selectedTest.id
-          ? {
-              ...test,
-              questions: test.testQuestions.length + 1,
-              testQuestions: [...test.testQuestions, newTestQuestionDraft],
-            }
-          : test,
-      ),
-    );
-    setCreateTestQuestionOpen(false);
-    setNewTestQuestionDraft(createNewQuestionDraft());
+  const addTest = async () => {
+    try {
+      await createPracticeTest(newTestDraft);
+      await refreshCourseContent();
+      setActiveTab("tests");
+      setCreateTestOpen(false);
+      setNewTestDraft({ title: "", description: "", category: "General", time: 15 });
+      toast({ title: "Practice test created", description: "The new timed test was saved to Supabase." });
+    } catch (error) {
+      showMutationError("Unable to create test", error);
+    }
   };
 
-  const deleteSelectedModule = () => {
+  const addQuestionToSelectedTest = async () => {
+    if (!selectedTest.dbId) {
+      showMutationError("Unable to create question", new Error("This test is missing its database id."));
+      return;
+    }
+
+    try {
+      await createPracticeTestQuestion(selectedTest.dbId, newTestQuestionDraft);
+      await refreshCourseContent();
+      setCreateTestQuestionOpen(false);
+      setNewTestQuestionDraft(createNewQuestionDraft());
+      toast({ title: "Question created", description: "The timed-test question was added to Supabase." });
+    } catch (error) {
+      showMutationError("Unable to create question", error);
+    }
+  };
+
+  const saveTestQuestion = async (questionIndex: number) => {
+    const question = selectedTest.testQuestions[questionIndex];
+
+    if (!question?.id) {
+      showMutationError("Unable to update question", new Error("This question is missing its database id."));
+      return;
+    }
+
+    try {
+      await updatePracticeTestQuestionRecord(question.id, question);
+      await refreshCourseContent();
+      toast({ title: "Question updated", description: "Timed-test question changes were saved." });
+    } catch (error) {
+      showMutationError("Unable to update question", error);
+    }
+  };
+
+  const deleteSelectedModule = async () => {
     if (moduleDrafts.length <= 1) {
       return;
     }
 
-    setModuleDrafts((current) => {
-      const filtered = current.filter((module) => module.id !== selectedModule.id);
-      setSelectedModuleId(filtered[0].id);
-      return filtered;
-    });
+    try {
+      await deleteModuleRecord(selectedModule.id);
+      await refreshCourseContent();
+      toast({ title: "Module deleted", description: "The module and its related content were removed." });
+    } catch (error) {
+      showMutationError("Unable to delete module", error);
+    }
   };
 
-  const deleteLesson = (lessonIndex: number) => {
-    setModuleDrafts((current) =>
-      current.map((module) =>
-        module.id === selectedModule.id
-          ? { ...module, lessons: module.lessons.filter((_, index) => index !== lessonIndex) }
-          : module,
-      ),
-    );
-  };
+  const deleteLesson = async (lessonIndex: number) => {
+    const lesson = selectedModule.lessons[lessonIndex];
 
-  const deleteModuleQuestion = (questionIndex: number) => {
-    setModuleDrafts((current) =>
-      current.map((module) =>
-        module.id === selectedModule.id
-          ? { ...module, quiz: module.quiz.filter((_, index) => index !== questionIndex) }
-          : module,
-      ),
-    );
-  };
-
-  const deleteSelectedTest = () => {
-    if (testDrafts.length <= 1) {
+    if (!lesson?.id) {
+      showMutationError("Unable to delete lecture", new Error("This lecture is missing its database id."));
       return;
     }
 
-    setTestDrafts((current) => {
-      const filtered = current.filter((test) => test.id !== selectedTest.id);
-      setSelectedTestId(filtered[0].id);
-      return filtered;
-    });
+    try {
+      await deleteLessonRecord(lesson.id);
+      await refreshCourseContent();
+      toast({ title: "Lecture deleted", description: "The lecture was removed from this module." });
+    } catch (error) {
+      showMutationError("Unable to delete lecture", error);
+    }
   };
 
-  const deleteTestQuestion = (questionIndex: number) => {
-    setTestDrafts((current) =>
-      current.map((test) =>
-        test.id === selectedTest.id
-          ? {
-              ...test,
-              questions: Math.max(test.testQuestions.length - 1, 0),
-              testQuestions: test.testQuestions.filter((_, index) => index !== questionIndex),
-            }
-          : test,
-      ),
-    );
+  const deleteModuleQuestion = async (questionIndex: number) => {
+    const question = selectedModule.quiz[questionIndex];
+
+    if (!question?.id) {
+      showMutationError("Unable to delete question", new Error("This question is missing its database id."));
+      return;
+    }
+
+    try {
+      await deleteModuleQuestionRecord(question.id);
+      await refreshCourseContent();
+      toast({ title: "Question deleted", description: "The module quiz question was removed." });
+    } catch (error) {
+      showMutationError("Unable to delete question", error);
+    }
   };
 
-  const deleteSelectedUser = () => {
+  const deleteSelectedTest = async () => {
+    if (testDrafts.length <= 1 || !selectedTest.dbId) {
+      return;
+    }
+
+    try {
+      await deletePracticeTestRecord(selectedTest.dbId);
+      await refreshCourseContent();
+      toast({ title: "Practice test deleted", description: "The test and its question bank were removed." });
+    } catch (error) {
+      showMutationError("Unable to delete test", error);
+    }
+  };
+
+  const deleteTestQuestion = async (questionIndex: number) => {
+    const question = selectedTest.testQuestions[questionIndex];
+
+    if (!question?.id) {
+      showMutationError("Unable to delete question", new Error("This question is missing its database id."));
+      return;
+    }
+
+    try {
+      await deletePracticeTestQuestionRecord(question.id);
+      await refreshCourseContent();
+      toast({ title: "Question deleted", description: "The timed-test question was removed." });
+    } catch (error) {
+      showMutationError("Unable to delete question", error);
+    }
+  };
+
+  const deleteSelectedUser = async () => {
     if (userRecords.length <= 1) {
       return;
     }
 
-    setUserRecords((current) => {
-      const filtered = current.filter((user) => user.id !== selectedUser.id);
-      setSelectedUserId(filtered[0].id);
-      return filtered;
-    });
+    try {
+      await deleteAdminUser(selectedUser.id);
+      await refreshUsers();
+      toast({ title: "User deleted", description: "The account was removed from Supabase Auth and profiles." });
+    } catch (error) {
+      showMutationError("Unable to delete user", error);
+    }
   };
 
-  const updateUser = (patch: Partial<AdminUser>) => {
+  const updateUser = async (patch: Partial<AdminUserRecord>) => {
     setUserRecords((current) => current.map((user) => (user.id === selectedUser.id ? { ...user, ...patch } : user)));
+
+    try {
+      await updateAdminUser(selectedUser.id, { plan: patch.plan, status: patch.status });
+      await refreshUsers();
+      toast({ title: "User updated", description: "Account access changes were saved to Supabase." });
+    } catch (error) {
+      showMutationError("Unable to update user", error);
+      await refreshUsers();
+    }
   };
 
   return (
@@ -562,7 +784,7 @@ const AdminDashboard = () => {
                           </div>
                           <div className="flex justify-end gap-3">
                             <DialogClose asChild>
-                              <Button variant="outline">Done</Button>
+                              <Button variant="outline" onClick={saveSelectedModule}>Done</Button>
                             </DialogClose>
                           </div>
                         </div>
@@ -578,7 +800,7 @@ const AdminDashboard = () => {
                       <AlertDialogContent>
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete this module?</AlertDialogTitle>
-                          <AlertDialogDescription>This will remove the module, its lesson list, and its quiz items from the admin mockup.</AlertDialogDescription>
+                          <AlertDialogDescription>This will remove the module, its lesson list, and its quiz items from the training library.</AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -647,7 +869,7 @@ const AdminDashboard = () => {
                           <Input value={newLessonDraft.chapterLabel} onChange={(event) => setNewLessonDraft((current) => ({ ...current, chapterLabel: event.target.value }))} className="bg-background/70" />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-sm font-medium text-foreground">Video URL</label>
+                          <label className="text-sm font-medium text-foreground">Video path or URL</label>
                           <Input value={newLessonDraft.videoUrl ?? ""} onChange={(event) => setNewLessonDraft((current) => ({ ...current, videoUrl: event.target.value || null }))} className="bg-background/70" />
                         </div>
                         <div className="space-y-2 sm:col-span-2">
@@ -655,7 +877,7 @@ const AdminDashboard = () => {
                           <Textarea value={newLessonDraft.summary} onChange={(event) => setNewLessonDraft((current) => ({ ...current, summary: event.target.value }))} className="min-h-[140px] bg-background/70" />
                         </div>
                         <div className="space-y-2 sm:col-span-2">
-                          <label className="text-sm font-medium text-foreground">Poster image URL</label>
+                          <label className="text-sm font-medium text-foreground">Poster path or URL</label>
                           <Input value={newLessonDraft.posterUrl ?? ""} onChange={(event) => setNewLessonDraft((current) => ({ ...current, posterUrl: event.target.value || null }))} className="bg-background/70" />
                         </div>
                         <div className="flex justify-end gap-3 sm:col-span-2">
@@ -689,7 +911,7 @@ const AdminDashboard = () => {
                               Edit
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="max-w-3xl rounded-[1.75rem] border-border/70 p-6 sm:p-7">
+                          <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto rounded-[1.75rem] border-border/70 p-6 sm:p-7">
                             <DialogHeader>
                               <DialogTitle className="font-heading text-2xl text-foreground">Edit lesson</DialogTitle>
                               <DialogDescription>
@@ -702,24 +924,128 @@ const AdminDashboard = () => {
                                 <Input value={lesson.title} onChange={(event) => updateLesson(index, { title: event.target.value })} className="bg-background/70" />
                               </div>
                               <div className="space-y-2">
-                                <label className="text-sm font-medium text-foreground">Duration</label>
-                                <Input value={lesson.duration} onChange={(event) => updateLesson(index, { duration: event.target.value })} className="bg-background/70" />
-                              </div>
-                              <div className="space-y-2">
                                 <label className="text-sm font-medium text-foreground">Chapter label</label>
                                 <Input value={lesson.chapterLabel} onChange={(event) => updateLesson(index, { chapterLabel: event.target.value })} className="bg-background/70" />
                               </div>
-                              <div className="space-y-2">
-                                <label className="text-sm font-medium text-foreground">Video URL</label>
+                              <div className="space-y-2 sm:col-span-2">
+                                <label className="text-sm font-medium text-foreground">Video path or URL</label>
                                 <Input value={lesson.videoUrl ?? ""} onChange={(event) => updateLesson(index, { videoUrl: event.target.value || null })} placeholder="https://..." className="bg-background/70" />
                               </div>
                               <div className="space-y-2 sm:col-span-2">
                                 <label className="text-sm font-medium text-foreground">Summary</label>
-                                <Textarea value={lesson.summary} onChange={(event) => updateLesson(index, { summary: event.target.value })} className="min-h-[140px] bg-background/70" />
+                                <Textarea value={lesson.summary} onChange={(event) => updateLesson(index, { summary: event.target.value })} className="min-h-[90px] bg-background/70" />
                               </div>
-                              <div className="space-y-2 sm:col-span-2">
-                                <label className="text-sm font-medium text-foreground">Poster image URL</label>
-                                <Input value={lesson.posterUrl ?? ""} onChange={(event) => updateLesson(index, { posterUrl: event.target.value || null })} placeholder="Poster URL" className="bg-background/70" />
+                              <div className="space-y-4 sm:col-span-2 rounded-2xl border border-border/60 bg-muted/30 p-4">
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                  <div className="space-y-2">
+                                    <label className="text-sm font-medium text-foreground">Upload MP4 or lesson video</label>
+                                    <input
+                                      id={`lesson-video-upload-${lesson.id}`}
+                                      type="file"
+                                      accept="video/mp4,video/webm,video/quicktime"
+                                      className="hidden"
+                                      disabled={uploadingAssetKey === `${lesson.id}-video`}
+                                      onChange={(event) => {
+                                        const file = event.target.files?.[0] ?? null;
+                                        void handleLessonAssetUpload(index, "video", file);
+                                        event.currentTarget.value = "";
+                                      }}
+                                    />
+                                    <div className="flex min-h-[3.5rem] items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/80 px-4 py-3">
+                                      <div className="min-w-0">
+                                        <p className="truncate text-sm font-medium text-foreground">
+                                          {uploadedAssetLabels[`${lesson.id}-video`] || "No video file selected yet"}
+                                        </p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                          {assetStatusText[`${lesson.id}-video`] ||
+                                            (lesson.videoUrl
+                                              ? "A linked video is already attached to this lecture."
+                                              : "Choose a local video file to upload. MP4, WebM, or MOV up to 500 MB.")}
+                                        </p>
+                                      </div>
+                                      <div className="flex shrink-0 gap-2">
+                                        {lesson.videoUrl ? (
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={uploadingAssetKey === `${lesson.id}-video`}
+                                            onClick={() => void handleRemoveLessonAsset(index, "video")}
+                                          >
+                                            Remove
+                                          </Button>
+                                        ) : null}
+                                        <label htmlFor={`lesson-video-upload-${lesson.id}`}>
+                                          <Button asChild variant="outline" size="sm" className="cursor-pointer">
+                                            <span>{uploadingAssetKey === `${lesson.id}-video` ? "Uploading..." : "Choose file"}</span>
+                                          </Button>
+                                        </label>
+                                      </div>
+                                    </div>
+                                    {uploadingAssetKey === `${lesson.id}-video` ? <Progress value={66} className="h-2" /> : null}
+                                  </div>
+                                  <div className="space-y-2">
+                                    <label className="text-sm font-medium text-foreground">Upload poster image</label>
+                                    <input
+                                      id={`lesson-poster-upload-${lesson.id}`}
+                                      type="file"
+                                      accept="image/png,image/jpeg,image/webp"
+                                      className="hidden"
+                                      disabled={uploadingAssetKey === `${lesson.id}-poster`}
+                                      onChange={(event) => {
+                                        const file = event.target.files?.[0] ?? null;
+                                        void handleLessonAssetUpload(index, "poster", file);
+                                        event.currentTarget.value = "";
+                                      }}
+                                    />
+                                    <div className="flex min-h-[3.5rem] items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/80 px-4 py-3">
+                                      <div className="min-w-0">
+                                        <p className="truncate text-sm font-medium text-foreground">
+                                          {uploadedAssetLabels[`${lesson.id}-poster`] || "No poster file selected yet"}
+                                        </p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                          {assetStatusText[`${lesson.id}-poster`] ||
+                                            (lesson.posterUrl
+                                              ? "A linked poster image is already attached to this lecture."
+                                              : "Choose a local poster image to upload. PNG, JPG, or WebP up to 10 MB.")}
+                                        </p>
+                                      </div>
+                                      <div className="flex shrink-0 gap-2">
+                                        {lesson.posterUrl ? (
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={uploadingAssetKey === `${lesson.id}-poster`}
+                                            onClick={() => void handleRemoveLessonAsset(index, "poster")}
+                                          >
+                                            Remove
+                                          </Button>
+                                        ) : null}
+                                        <label htmlFor={`lesson-poster-upload-${lesson.id}`}>
+                                          <Button asChild variant="outline" size="sm" className="cursor-pointer">
+                                            <span>{uploadingAssetKey === `${lesson.id}-poster` ? "Uploading..." : "Choose file"}</span>
+                                          </Button>
+                                        </label>
+                                      </div>
+                                    </div>
+                                    {uploadingAssetKey === `${lesson.id}-poster` ? <Progress value={66} className="h-2" /> : null}
+                                  </div>
+                                </div>
+                                {(uploadedAssetLabels[`${lesson.id}-video`] || uploadedAssetLabels[`${lesson.id}-poster`]) && (
+                                  <div className="flex flex-wrap gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                                    {uploadedAssetLabels[`${lesson.id}-video`] ? (
+                                      <span className="inline-flex items-center gap-2">
+                                        <CheckCircle2 className="h-4 w-4" />
+                                        Video ready: {uploadedAssetLabels[`${lesson.id}-video`]}
+                                      </span>
+                                    ) : null}
+                                    {uploadedAssetLabels[`${lesson.id}-poster`] ? (
+                                      <span className="inline-flex items-center gap-2">
+                                        <CheckCircle2 className="h-4 w-4" />
+                                        Poster ready: {uploadedAssetLabels[`${lesson.id}-poster`]}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                )}
                               </div>
                               <div className="flex justify-between gap-3 sm:col-span-2">
                                 <AlertDialog>
@@ -732,7 +1058,7 @@ const AdminDashboard = () => {
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Delete this lecture?</AlertDialogTitle>
-                                      <AlertDialogDescription>This lecture will be removed from the selected module in the admin mockup.</AlertDialogDescription>
+                                      <AlertDialogDescription>This lecture will be removed from the selected module.</AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                       <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -741,7 +1067,7 @@ const AdminDashboard = () => {
                                   </AlertDialogContent>
                                 </AlertDialog>
                                 <DialogClose asChild>
-                                  <Button variant="outline">Done</Button>
+                                  <Button variant="outline" onClick={() => saveLesson(index)}>Done</Button>
                                 </DialogClose>
                               </div>
                             </div>
@@ -886,7 +1212,7 @@ const AdminDashboard = () => {
                                   </AlertDialogContent>
                                 </AlertDialog>
                                 <DialogClose asChild>
-                                  <Button variant="outline">Done</Button>
+                                  <Button variant="outline" onClick={() => saveModuleQuestion(questionIndex)}>Done</Button>
                                 </DialogClose>
                               </div>
                             </div>
@@ -1004,8 +1330,8 @@ const AdminDashboard = () => {
                             <Input type="number" min={1} value={selectedTest.time} onChange={(event) => updateSelectedTest({ time: Number(event.target.value) || 1 })} className="bg-background/70" />
                           </div>
                           <div className="space-y-2">
-                            <label className="text-sm font-medium text-foreground">Displayed question count</label>
-                            <Input type="number" min={1} value={selectedTest.questions} onChange={(event) => updateSelectedTest({ questions: Number(event.target.value) || 1 })} className="bg-background/70" />
+                            <label className="text-sm font-medium text-foreground">Question count</label>
+                            <Input type="number" value={selectedTest.testQuestions.length} readOnly className="bg-background/70 text-muted-foreground" />
                           </div>
                           <div className="space-y-2 lg:col-span-2">
                             <label className="text-sm font-medium text-foreground">Test description</label>
@@ -1013,7 +1339,7 @@ const AdminDashboard = () => {
                           </div>
                           <div className="flex justify-end gap-3 lg:col-span-2">
                             <DialogClose asChild>
-                              <Button variant="outline">Done</Button>
+                              <Button variant="outline" onClick={saveSelectedTest}>Done</Button>
                             </DialogClose>
                           </div>
                         </div>
@@ -1029,7 +1355,7 @@ const AdminDashboard = () => {
                       <AlertDialogContent>
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete this practice test?</AlertDialogTitle>
-                          <AlertDialogDescription>This will remove the test and its full question bank from the admin mockup.</AlertDialogDescription>
+                          <AlertDialogDescription>This will remove the test and its full question bank from the training library.</AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -1191,7 +1517,7 @@ const AdminDashboard = () => {
                                   </AlertDialogContent>
                                 </AlertDialog>
                                 <DialogClose asChild>
-                                  <Button variant="outline">Done</Button>
+                                  <Button variant="outline" onClick={() => saveTestQuestion(questionIndex)}>Done</Button>
                                 </DialogClose>
                               </div>
                             </div>
@@ -1266,7 +1592,7 @@ const AdminDashboard = () => {
                       <AlertDialogContent>
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete this user?</AlertDialogTitle>
-                          <AlertDialogDescription>This removes the user record from the admin mockup list.</AlertDialogDescription>
+                          <AlertDialogDescription>This removes the user from authentication and the app profile records.</AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -1320,7 +1646,7 @@ const AdminDashboard = () => {
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-accent">Status</p>
                     <div className="mt-4 flex flex-wrap gap-3">
-                      {(["active", "invited", "suspended"] as UserStatus[]).map((status) => (
+                      {(["active", "invited", "suspended"] as AdminUserStatus[]).map((status) => (
                         <Button
                           key={status}
                           variant={selectedUser.status === status ? "hero" : "outline"}
@@ -1334,28 +1660,6 @@ const AdminDashboard = () => {
                   </div>
                 </div>
 
-                <div className="mt-6 grid gap-4 lg:grid-cols-2">
-                  <div className="rounded-2xl border border-border/60 bg-card p-5">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Support actions</p>
-                    <div className="mt-4 space-y-3 text-sm text-foreground">
-                      <div className="flex items-center gap-3 rounded-2xl bg-muted/60 px-4 py-3">
-                        <Mail className="h-4 w-4 text-accent" />
-                        Send reset or onboarding email
-                      </div>
-                      <div className="flex items-center gap-3 rounded-2xl bg-muted/60 px-4 py-3">
-                        <Sparkles className="h-4 w-4 text-accent" />
-                        Move the account between free and premium access
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-border/60 bg-card p-5">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Why this matters</p>
-                    <p className="mt-4 text-sm leading-7 text-muted-foreground">
-                      User management ties directly into the same access model the learner dashboards already use, so plan changes and account status remain easy to reason about when this is wired to Supabase later.
-                    </p>
-                  </div>
-                </div>
               </section>
             </div>
           </motion.div>

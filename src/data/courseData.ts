@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 
 export interface QuizQuestion {
+  id?: number;
   question: string;
   options: string[];
   correctIndex: number;
@@ -8,6 +9,7 @@ export interface QuizQuestion {
 }
 
 export interface ModuleLesson {
+  id?: number;
   title: string;
   duration: string;
   summary: string;
@@ -18,6 +20,7 @@ export interface ModuleLesson {
 
 export interface ModuleInfo {
   id: number;
+  slug?: string;
   icon: LucideIcon;
   title: string;
   description: string;
@@ -27,6 +30,8 @@ export interface ModuleInfo {
 
 export interface PracticeTest {
   id: string;
+  dbId?: number;
+  slug?: string;
   title: string;
   description: string;
   questions: number;

@@ -1,9 +1,13 @@
+import { Suspense, lazy } from "react";
 import Navbar from "@/components/landing/Navbar";
 import HeroSection from "@/components/landing/HeroSection";
-import ModulesSection from "@/components/landing/ModulesSection";
-import HowItWorksSection from "@/components/landing/HowItWorksSection";
-import PricingSection from "@/components/landing/PricingSection";
-import Footer from "@/components/landing/Footer";
+
+const ModulesSection = lazy(() => import("@/components/landing/ModulesSection"));
+const HowItWorksSection = lazy(() => import("@/components/landing/HowItWorksSection"));
+const PricingSection = lazy(() => import("@/components/landing/PricingSection"));
+const Footer = lazy(() => import("@/components/landing/Footer"));
+
+const SectionFallback = () => <div className="h-24" />;
 
 const Index = () => {
   return (
@@ -11,11 +15,15 @@ const Index = () => {
       <Navbar />
       <main>
         <HeroSection />
-        <ModulesSection />
-        <HowItWorksSection />
-        <PricingSection />
+        <Suspense fallback={<SectionFallback />}>
+          <ModulesSection />
+          <HowItWorksSection />
+          <PricingSection />
+        </Suspense>
       </main>
-      <Footer />
+      <Suspense fallback={<SectionFallback />}>
+        <Footer />
+      </Suspense>
     </div>
   );
 };

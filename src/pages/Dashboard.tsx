@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
+import { initializeAuthSession } from "@/lib/auth";
 import { FREE_PREVIEW_MODULE_ID, FREE_PREVIEW_TEST_ID, canAccessModule, canAccessTest, isFreePreviewMode } from "@/lib/access";
 import { getAllModuleProgress, isModuleFullyCompleted } from "@/lib/moduleProgressStorage";
 import {
@@ -71,16 +72,29 @@ const Dashboard = () => {
   const practiceTests = resolvedCourseContent.practiceTests;
   const contentError = resolvedCourseContent.error;
   const [activeTab, setActiveTab] = useState<Tab>("modules");
-  const [testMeta, setTestMeta] = useState<Record<string, TestCardMeta>>({});
+  const [checkoutNotice, setCheckoutNotice] = useState("");
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
-    if (practiceTests.length === 0) {
-      setTestMeta({});
+    const checkoutStatus = searchParams.get("checkout");
+
+    if (checkoutStatus !== "success") {
       return;
     }
 
-    const nextMeta = Object.fromEntries(
+    void (async () => {
+      await initializeAuthSession();
+      setCheckoutNotice("Premium access is now active on your account.");
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("checkout");
+      setSearchParams(nextParams, { replace: true });
+    })();
+  }, [searchParams, setSearchParams]);
+
+  const testMeta = useMemo<Record<string, TestCardMeta>>(
+    () =>
+      Object.fromEntries(
       practiceTests.map((test) => {
         const attempts = getPracticeAttempts(test.id);
         const bestAttempt = getBestPracticeAttempt(test.id);
@@ -93,10 +107,9 @@ const Dashboard = () => {
           },
         ];
       }),
-    );
-
-    setTestMeta(nextMeta);
-  }, [practiceTests]);
+    ),
+    [practiceTests],
+  );
 
   if (isLoading && (modules.length === 0 || practiceTests.length === 0)) {
     return (
@@ -253,6 +266,16 @@ const Dashboard = () => {
       <DashboardHeader />
 
       <div className="container mx-auto px-4 py-8">
+        {checkoutNotice ? (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-800"
+          >
+            {checkoutNotice}
+          </motion.div>
+        ) : null}
+
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

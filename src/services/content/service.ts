@@ -23,6 +23,7 @@ interface ModuleRow {
 }
 
 interface LessonRow {
+  id: number;
   title: string;
   chapter_label: string | null;
   summary: string;
@@ -33,6 +34,7 @@ interface LessonRow {
 }
 
 interface QuestionRow {
+  id: number;
   question: string;
   options: string[] | null;
   correct_index: number;
@@ -41,6 +43,7 @@ interface QuestionRow {
 }
 
 interface PracticeTestRow {
+  id: number;
   slug: string;
   title: string;
   description: string;
@@ -73,6 +76,7 @@ const defaultPracticeTestIcon = FileText;
 const formatDuration = (minutes: number) => `${minutes} min`;
 
 const mapQuestion = (question: QuestionRow): QuizQuestion => ({
+  id: question.id,
   question: question.question,
   options: Array.isArray(question.options) ? question.options : [],
   correctIndex: question.correct_index,
@@ -80,6 +84,7 @@ const mapQuestion = (question: QuestionRow): QuizQuestion => ({
 });
 
 const mapLesson = (lesson: LessonRow, index: number): ModuleLesson => ({
+  id: lesson.id,
   title: lesson.title,
   duration: formatDuration(lesson.duration_minutes),
   summary: lesson.summary,
@@ -90,6 +95,7 @@ const mapLesson = (lesson: LessonRow, index: number): ModuleLesson => ({
 
 const mapModule = (module: ModuleRow): ModuleInfo => ({
   id: module.id,
+  slug: module.slug,
   icon: moduleIconBySlug[module.slug] ?? defaultModuleIcon,
   title: module.title,
   description: module.description,
@@ -103,6 +109,8 @@ const mapModule = (module: ModuleRow): ModuleInfo => ({
 
 const mapPracticeTest = (test: PracticeTestRow): PracticeTest => ({
   id: test.slug,
+  dbId: test.id,
+  slug: test.slug,
   title: test.title,
   description: test.description,
   questions: test.practice_test_questions?.length ?? 0,
@@ -140,6 +148,7 @@ export const fetchCourseContent = async (): Promise<CourseContent> => {
           description,
           sort_order,
           lessons (
+            id,
             title,
             chapter_label,
             summary,
@@ -149,6 +158,7 @@ export const fetchCourseContent = async (): Promise<CourseContent> => {
             poster_path
           ),
           module_quiz_questions (
+            id,
             question,
             options,
             correct_index,
@@ -160,12 +170,14 @@ export const fetchCourseContent = async (): Promise<CourseContent> => {
       supabase
         .from("practice_tests")
         .select(`
+          id,
           slug,
           title,
           description,
           category,
           time_limit_minutes,
           practice_test_questions (
+            id,
             question,
             options,
             correct_index,

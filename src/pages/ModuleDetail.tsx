@@ -27,6 +27,7 @@ import {
 import { getModuleProgress, isModuleFullyCompleted, upsertModuleProgress } from "@/lib/moduleProgressStorage";
 import { getEmptyCourseContent } from "@/services/content/service";
 import { useCourseContent } from "@/services/content/useCourseContent";
+import { persistModuleProgress, persistModuleQuizAttempt } from "@/services/progress/supabase-sync";
 
 const LockedMask = ({
   title,
@@ -82,6 +83,7 @@ const ModuleDetail = () => {
   const syncProgress = (updater: Parameters<typeof upsertModuleProgress>[1]) => {
     const next = upsertModuleProgress(moduleId, updater);
     setCompletedLessons(next.completedLessons);
+    void persistModuleProgress(next);
     return next;
   };
 
@@ -203,6 +205,10 @@ const ModuleDetail = () => {
       quizTotal: quiz.length,
       updatedAt: new Date().toISOString(),
     }));
+    const latest = getModuleProgress(moduleId);
+    if (latest) {
+      void persistModuleQuizAttempt(latest);
+    }
     setQuizFinished(true);
   };
 

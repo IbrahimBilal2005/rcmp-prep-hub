@@ -8,6 +8,8 @@ import { canAccessModule, isPreviewLessonUnlocked } from "@/lib/access";
 import { getModuleProgress, upsertModuleProgress } from "@/lib/moduleProgressStorage";
 import { getEmptyCourseContent } from "@/services/content/service";
 import { useCourseContent } from "@/services/content/useCourseContent";
+import { persistModuleProgress } from "@/services/progress/supabase-sync";
+import { resolveLessonAssetUrl } from "@/services/storage/lesson-assets";
 
 const LessonView = () => {
   const { data: courseContent, isLoading } = useCourseContent();
@@ -17,6 +19,8 @@ const LessonView = () => {
   const lessonNumber = Number(lessonIndex);
   const mod = modules.find((entry) => entry.id === moduleId);
   const [completedLessons, setCompletedLessons] = useState<number[]>([]);
+  const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string | null>(null);
+  const [resolvedPosterUrl, setResolvedPosterUrl] = useState<string | null>(null);
 
   if (isLoading && modules.length === 0) {
     return (
@@ -67,8 +71,39 @@ const LessonView = () => {
       lastLessonIndex: lessonNumber,
       updatedAt: new Date().toISOString(),
     }));
+    void persistModuleProgress(next);
     setCompletedLessons(next.completedLessons);
   }, [lesson, lessonNumber, lessonUnlocked, moduleId]);
+
+  useEffect(() => {
+    let active = true;
+
+    void (async () => {
+      if (!lesson) {
+        if (active) {
+          setResolvedVideoUrl(null);
+          setResolvedPosterUrl(null);
+        }
+        return;
+      }
+
+      const [videoUrl, posterUrl] = await Promise.all([
+        resolveLessonAssetUrl("video", lesson.videoUrl),
+        resolveLessonAssetUrl("poster", lesson.posterUrl),
+      ]);
+
+      if (!active) {
+        return;
+      }
+
+      setResolvedVideoUrl(videoUrl);
+      setResolvedPosterUrl(posterUrl);
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [lesson]);
 
   if (!lesson || !lessonUnlocked) {
     return <Navigate to={`/module/${moduleId}`} replace />;
@@ -94,6 +129,7 @@ const LessonView = () => {
       };
     });
 
+    void persistModuleProgress(next);
     setCompletedLessons(next.completedLessons);
   };
 
@@ -138,27 +174,43 @@ const LessonView = () => {
                 </div>
               </div>
 
-              <div
-                className="relative aspect-video overflow-hidden rounded-[1.9rem] border border-border/70 bg-[linear-gradient(180deg,hsl(214_62%_19%)_0%,hsl(210_58%_12%)_100%)] shadow-[0_28px_80px_-42px_rgba(17,27,44,0.82)]"
-                style={lesson.posterUrl ? { backgroundImage: `url(${lesson.posterUrl})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
-              >
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.16),transparent_36%)]" />
-                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,17,30,0.06)_0%,rgba(7,17,30,0.22)_48%,rgba(7,17,30,0.56)_100%)]" />
-                <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
-                  <div className="flex h-24 w-24 items-center justify-center rounded-full border border-white/20 bg-white/95 text-navy shadow-[0_30px_65px_-30px_rgba(255,255,255,0.65)] transition-transform duration-200">
-                    <PlayCircle className="h-11 w-11" />
+              {resolvedVideoUrl ? (
+                <div className="overflow-hidden rounded-[1.9rem] border border-border/70 bg-[#07111e] shadow-[0_28px_80px_-42px_rgba(17,27,44,0.82)]">
+                  <video
+                    key={resolvedVideoUrl}
+                    controls
+                    controlsList="nodownload"
+                    preload="metadata"
+                    poster={resolvedPosterUrl ?? undefined}
+                    className="aspect-video w-full bg-[#07111e] object-contain"
+                  >
+                    <source src={resolvedVideoUrl} type="video/mp4" />
+                    Your browser does not support embedded video playback.
+                  </video>
+                </div>
+              ) : (
+                <div
+                  className="relative aspect-video overflow-hidden rounded-[1.9rem] border border-border/70 bg-[linear-gradient(180deg,hsl(214_62%_19%)_0%,hsl(210_58%_12%)_100%)] shadow-[0_28px_80px_-42px_rgba(17,27,44,0.82)]"
+                  style={resolvedPosterUrl ? { backgroundImage: `url(${resolvedPosterUrl})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
+                >
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.16),transparent_36%)]" />
+                  <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,17,30,0.06)_0%,rgba(7,17,30,0.22)_48%,rgba(7,17,30,0.56)_100%)]" />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
+                    <div className="flex h-24 w-24 items-center justify-center rounded-full border border-white/20 bg-white/95 text-navy shadow-[0_30px_65px_-30px_rgba(255,255,255,0.65)] transition-transform duration-200">
+                      <PlayCircle className="h-11 w-11" />
+                    </div>
+                  </div>
+                  <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 px-5 pb-5 sm:px-6 sm:pb-6">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/80">{lesson.chapterLabel}</p>
+                      <p className="mt-2 text-lg font-semibold text-white sm:text-xl">{lesson.title}</p>
+                    </div>
+                    <div className="rounded-full border border-white/15 bg-black/20 px-3 py-1.5 text-sm font-medium text-white backdrop-blur-sm">
+                      {lesson.duration}
+                    </div>
                   </div>
                 </div>
-                <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 px-5 pb-5 sm:px-6 sm:pb-6">
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/80">{lesson.chapterLabel}</p>
-                    <p className="mt-2 text-lg font-semibold text-white sm:text-xl">{lesson.title}</p>
-                  </div>
-                  <div className="rounded-full border border-white/15 bg-black/20 px-3 py-1.5 text-sm font-medium text-white backdrop-blur-sm">
-                    {lesson.duration}
-                  </div>
-                </div>
-              </div>
+              )}
 
               <div className="mt-5 rounded-[1.75rem] border border-border/70 bg-card/95 p-5 sm:p-6">
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-accent">Summary</p>

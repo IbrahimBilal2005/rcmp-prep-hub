@@ -1,20 +1,35 @@
-import { useEffect } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { MotionConfig } from "framer-motion";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
-import { isAuthenticated } from "@/lib/auth";
+import { getAuthSession, initializeAuthSession, isAuthenticated, subscribeToAuthChanges } from "@/lib/auth";
 import { AppProviders } from "@/providers/AppProviders";
-import Index from "./pages/Index.tsx";
-import AdminDashboard from "./pages/AdminDashboard.tsx";
-import Dashboard from "./pages/Dashboard.tsx";
-import ModuleDetail from "./pages/ModuleDetail.tsx";
-import LessonView from "./pages/LessonView.tsx";
-import PracticeTestView from "./pages/PracticeTestView.tsx";
-import Signup from "./pages/Signup.tsx";
-import NotFound from "./pages/NotFound.tsx";
+
+const Index = lazy(() => import("./pages/Index.tsx"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard.tsx"));
+const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
+const ModuleDetail = lazy(() => import("./pages/ModuleDetail.tsx"));
+const LessonView = lazy(() => import("./pages/LessonView.tsx"));
+const PracticeTestView = lazy(() => import("./pages/PracticeTestView.tsx"));
+const Signup = lazy(() => import("./pages/Signup.tsx"));
+const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 const RequireAuth = () => {
   if (!isAuthenticated()) {
     return <Navigate to="/signup?mode=signup" replace />;
+  }
+
+  return <Outlet />;
+};
+
+const RequireAdmin = () => {
+  const session = getAuthSession();
+
+  if (!session) {
+    return <Navigate to="/signup?mode=login" replace />;
+  }
+
+  if (session.role !== "admin") {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <Outlet />;
@@ -30,23 +45,63 @@ const ScrollToTop = () => {
   return null;
 };
 
+const RouteFallback = () => <div className="min-h-screen bg-background" />;
+
+const AuthBootstrap = ({ children }: { children: React.ReactNode }) => {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    let unsubscribe = () => undefined;
+
+    void (async () => {
+      await initializeAuthSession();
+
+      if (!active) {
+        return;
+      }
+
+      setReady(true);
+
+      unsubscribe = subscribeToAuthChanges();
+    })();
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
+
+  if (!ready) {
+    return <div className="min-h-screen bg-background" />;
+  }
+
+  return <>{children}</>;
+};
+
 const App = () => (
   <AppProviders>
     <MotionConfig reducedMotion="user">
       <BrowserRouter>
-        <ScrollToTop />
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route element={<RequireAuth />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/module/:id" element={<ModuleDetail />} />
-            <Route path="/module/:id/lesson/:lessonIndex" element={<LessonView />} />
-            <Route path="/test/:id" element={<PracticeTestView />} />
-          </Route>
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthBootstrap>
+          <ScrollToTop />
+          <Suspense fallback={<RouteFallback />}>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route element={<RequireAdmin />}>
+                <Route path="/admin" element={<AdminDashboard />} />
+              </Route>
+              <Route element={<RequireAuth />}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/module/:id" element={<ModuleDetail />} />
+                <Route path="/module/:id/lesson/:lessonIndex" element={<LessonView />} />
+                <Route path="/test/:id" element={<PracticeTestView />} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </AuthBootstrap>
       </BrowserRouter>
     </MotionConfig>
   </AppProviders>

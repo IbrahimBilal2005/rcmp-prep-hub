@@ -42,11 +42,6 @@ const Navbar = () => {
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
-          <Link to="/admin">
-            <Button variant="outline" className="h-11 px-5 bg-[rgba(245,250,255,0.24)] text-foreground hover:bg-[rgba(255,255,255,0.62)]">
-              Admin
-            </Button>
-          </Link>
           <Link to="/signup?mode=login">
             <Button variant="ghost" className="h-11 px-5 bg-[rgba(245,250,255,0.34)] text-foreground hover:bg-[rgba(255,255,255,0.62)]">
               Login
@@ -73,11 +68,6 @@ const Navbar = () => {
           <a href="#modules" className="block rounded-2xl px-3 py-3 text-sm text-muted-foreground hover:bg-white/50 hover:text-foreground" onClick={() => setMobileOpen(false)}>Modules</a>
           <a href="#pricing" className="block rounded-2xl px-3 py-3 text-sm text-muted-foreground hover:bg-white/50 hover:text-foreground" onClick={() => setMobileOpen(false)}>Pricing</a>
           <a href="#how-it-works" className="block rounded-2xl px-3 py-3 text-sm text-muted-foreground hover:bg-white/50 hover:text-foreground" onClick={() => setMobileOpen(false)}>How It Works</a>
-          <Link to="/admin" onClick={() => setMobileOpen(false)}>
-            <Button variant="outline" className="w-full justify-center bg-white/45">
-              Admin Dashboard
-            </Button>
-          </Link>
           <Link to="/signup?mode=login" onClick={() => setMobileOpen(false)}>
             <Button variant="ghost" className="w-full justify-center">Login</Button>
           </Link>

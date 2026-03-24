@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Check, ChevronRight, Crown, LockKeyhole, Mail, UserRound } from "lucide-react";
 import BrandLockup from "@/components/brand/BrandLockup";
@@ -15,9 +15,10 @@ type Step = "account" | "plan";
 const Signup = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const storedSession = useMemo(() => getAuthSession(), []);
+  const [storedSession] = useState(() => getAuthSession());
   const modeParam = searchParams.get("mode");
   const stepParam = searchParams.get("step");
+  const checkoutParam = searchParams.get("checkout");
 
   const [mode, setMode] = useState<Mode>(modeParam === "login" ? "login" : "signup");
   const [step, setStep] = useState<Step>("account");
@@ -42,8 +43,8 @@ const Signup = () => {
           }
         : null,
     );
-    setError("");
-  }, [modeParam, stepParam, storedSession]);
+    setError(checkoutParam === "cancelled" ? "Checkout was cancelled. You can choose a plan again whenever you're ready." : "");
+  }, [checkoutParam, modeParam, stepParam, storedSession]);
 
   const handleAccountSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -58,11 +59,12 @@ const Signup = () => {
       if (mode === "login") {
         const session = await signInWithEmail({ email, password });
         saveAuthSession(session);
-        navigate("/dashboard");
+        navigate(session.role === "admin" ? "/admin" : "/dashboard");
         return;
       }
 
       const profile = await signUpWithEmail({ name, email, password });
+      saveAuthSession(profile);
       setPendingProfile(profile);
       setStep("plan");
     } catch (err) {
@@ -89,10 +91,10 @@ const Signup = () => {
       };
 
       const result = await activatePlan(selectedPlan, session);
-      saveAuthSession(session);
 
       if (result.status === "activated") {
-        navigate("/dashboard");
+        saveAuthSession(session);
+        navigate(session.role === "admin" ? "/admin" : "/dashboard");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to continue with that plan right now.");
@@ -129,7 +131,7 @@ const Signup = () => {
 
             <div className="space-y-4">
               {[
-                { step: "1", title: "Create your account", desc: "Use email and password so the flow maps cleanly to Supabase auth later." },
+                { step: "1", title: "Create your account", desc: "Use email and password so your account is created directly in Supabase Auth." },
                 { step: "2", title: "Choose your plan", desc: "Free Plan and Premium Access are both available after account creation." },
                 { step: "3", title: "Enter the dashboard", desc: "Free shows the same UI with limits. Premium unlocks the full resource library." },
               ].map((item) => (

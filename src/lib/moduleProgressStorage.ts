@@ -40,6 +40,18 @@ const writeProgressMap = (progressMap: Record<number, ModuleProgressRecord>) => 
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(progressMap));
 };
 
+export const replaceAllModuleProgress = (progressMap: Record<number, ModuleProgressRecord>) => {
+  writeProgressMap(progressMap);
+};
+
+export const clearModuleProgress = () => {
+  if (!canUseStorage()) {
+    return;
+  }
+
+  window.localStorage.removeItem(STORAGE_KEY);
+};
+
 export const getAllModuleProgress = () => readProgressMap();
 
 export const getModuleProgress = (moduleId: number): ModuleProgressRecord | null =>

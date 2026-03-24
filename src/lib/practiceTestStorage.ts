@@ -41,6 +41,10 @@ const writeAttempts = (attempts: PracticeAttemptRecord[]) => {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(attempts));
 };
 
+export const replacePracticeAttempts = (attempts: PracticeAttemptRecord[]) => {
+  writeAttempts(attempts);
+};
+
 export const getPracticeAttempts = (testId: string) =>
   readAttempts()
     .filter((attempt) => attempt.testId === testId)
