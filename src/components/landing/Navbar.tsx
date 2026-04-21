@@ -64,10 +64,28 @@ const Navbar = () => {
       </div>
 
       {mobileOpen && (
-        <div className="mx-auto mt-3 max-w-[88rem] space-y-3 rounded-[2rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.8),rgba(247,243,238,0.7))] px-4 py-4 shadow-[0_28px_80px_-48px_rgba(15,23,42,0.28),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-2xl md:hidden sm:px-5 sm:py-5">
-          <a href="#modules" className="block rounded-2xl px-3 py-3 text-sm text-muted-foreground hover:bg-white/50 hover:text-foreground" onClick={() => setMobileOpen(false)}>Modules</a>
-          <a href="#pricing" className="block rounded-2xl px-3 py-3 text-sm text-muted-foreground hover:bg-white/50 hover:text-foreground" onClick={() => setMobileOpen(false)}>Pricing</a>
-          <a href="#how-it-works" className="block rounded-2xl px-3 py-3 text-sm text-muted-foreground hover:bg-white/50 hover:text-foreground" onClick={() => setMobileOpen(false)}>How It Works</a>
+        <div className="mx-auto mt-3 max-w-[88rem] space-y-3 rounded-[2rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.8),rgba(247,243,238,0.7))] px-4 py-4 text-center shadow-[0_28px_80px_-48px_rgba(15,23,42,0.28),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-2xl md:hidden sm:px-5 sm:py-5">
+          <a
+            href="#modules"
+            className="block rounded-2xl px-3 py-3 text-sm font-medium text-muted-foreground hover:bg-white/50 hover:text-foreground"
+            onClick={() => setMobileOpen(false)}
+          >
+            Modules
+          </a>
+          <a
+            href="#pricing"
+            className="block rounded-2xl px-3 py-3 text-sm font-medium text-muted-foreground hover:bg-white/50 hover:text-foreground"
+            onClick={() => setMobileOpen(false)}
+          >
+            Pricing
+          </a>
+          <a
+            href="#how-it-works"
+            className="block rounded-2xl px-3 py-3 text-sm font-medium text-muted-foreground hover:bg-white/50 hover:text-foreground"
+            onClick={() => setMobileOpen(false)}
+          >
+            How It Works
+          </a>
           <Link to="/signup?mode=login" onClick={() => setMobileOpen(false)}>
             <Button variant="ghost" className="w-full justify-center">Login</Button>
           </Link>
