@@ -106,7 +106,7 @@ const HowItWorksSection = () => {
 
                     <div className="mt-7">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <h3 className="max-w-sm font-heading text-[2rem] font-semibold leading-[0.98] text-foreground">{step.title}</h3>
+                        <h3 className="max-w-sm font-heading text-[1.6rem] font-semibold leading-[1] text-foreground sm:text-[2rem]">{step.title}</h3>
                         <span className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">{step.stat}</span>
                       </div>
                       <p className="mt-4 max-w-xl text-sm leading-7 text-muted-foreground">{step.desc}</p>

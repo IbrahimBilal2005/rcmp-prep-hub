@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  ArrowLeft,
   BookOpen,
   Crown,
   CheckCircle2,
@@ -640,29 +639,21 @@ const AdminDashboard = () => {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b border-border/70 bg-background/88 backdrop-blur-xl">
         <div className="app-shell flex h-16 items-center justify-between gap-4">
-          <Link to="/" className="min-w-0">
-            <BrandLockup size="sm" subtitle="Admin Dashboard" textClassName="text-foreground" />
+          <Link to="/" className="flex items-center gap-2 min-w-0">
+            <BrandLockup size="sm" subtitle="Admin" textClassName="text-foreground" />
           </Link>
-          <div className="flex items-center gap-3">
-            <Link to="/">
-              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-                <ArrowLeft className="h-4 w-4" />
-                Back to site
-              </Button>
-            </Link>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-foreground"
-              onClick={() => {
-                clearAuthSession();
-                navigate("/");
-              }}
-            >
-              <LogOut className="h-4 w-4" />
-              Logout
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground"
+            onClick={() => {
+              clearAuthSession();
+              navigate("/");
+            }}
+          >
+            <LogOut className="h-4 w-4 mr-1" />
+            Logout
+          </Button>
         </div>
       </header>
 

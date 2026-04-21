@@ -8,14 +8,14 @@ const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <nav className="fixed inset-x-0 top-4 z-50 px-4 sm:top-6 sm:px-6 lg:px-8">
-      <div className="mx-auto flex min-h-[4.9rem] max-w-[88rem] items-center justify-between rounded-full border border-[rgba(225,235,248,0.88)] bg-[linear-gradient(180deg,rgba(243,248,255,0.72),rgba(229,238,248,0.52))] px-4 shadow-[0_28px_90px_-46px_rgba(15,23,42,0.24),inset_0_1px_0_rgba(255,255,255,0.96)] ring-1 ring-[rgba(236,244,255,0.52)] backdrop-blur-2xl sm:px-6">
-        <Link to="/" className="flex items-center gap-2">
+    <nav className="fixed inset-x-0 top-3 z-50 px-4 sm:top-6 sm:px-6 lg:px-8">
+      <div className="mx-auto flex min-h-[4.5rem] max-w-[88rem] items-center justify-between gap-3 rounded-full border border-[rgba(225,235,248,0.88)] bg-[linear-gradient(180deg,rgba(243,248,255,0.72),rgba(229,238,248,0.52))] px-3 shadow-[0_28px_90px_-46px_rgba(15,23,42,0.24),inset_0_1px_0_rgba(255,255,255,0.96)] ring-1 ring-[rgba(236,244,255,0.52)] backdrop-blur-2xl sm:min-h-[4.9rem] sm:px-6">
+        <Link to="/" className="min-w-0 flex items-center gap-2">
           <BrandLockup
             size="sm"
             subtitle="RCMP Prep"
             textClassName="text-foreground"
-            subtitleClassName="text-muted-foreground"
+            subtitleClassName="hidden text-muted-foreground sm:block"
             logoShell="solid"
           />
         </Link>
@@ -56,7 +56,7 @@ const Navbar = () => {
         </div>
 
         <button
-          className="rounded-full border border-[rgba(232,240,250,0.95)] bg-[rgba(244,249,255,0.68)] p-3 text-foreground shadow-[0_14px_36px_-24px_rgba(15,23,42,0.24)] backdrop-blur-xl md:hidden"
+          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border border-[rgba(232,240,250,0.95)] bg-[rgba(244,249,255,0.68)] p-0 text-foreground shadow-[0_14px_36px_-24px_rgba(15,23,42,0.24)] backdrop-blur-xl md:hidden"
           onClick={() => setMobileOpen(!mobileOpen)}
         >
           {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -64,7 +64,7 @@ const Navbar = () => {
       </div>
 
       {mobileOpen && (
-        <div className="mx-auto mt-3 max-w-[88rem] space-y-3 rounded-[2rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.8),rgba(247,243,238,0.7))] px-5 py-5 shadow-[0_28px_80px_-48px_rgba(15,23,42,0.28),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-2xl md:hidden">
+        <div className="mx-auto mt-3 max-w-[88rem] space-y-3 rounded-[2rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.8),rgba(247,243,238,0.7))] px-4 py-4 shadow-[0_28px_80px_-48px_rgba(15,23,42,0.28),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-2xl md:hidden sm:px-5 sm:py-5">
           <a href="#modules" className="block rounded-2xl px-3 py-3 text-sm text-muted-foreground hover:bg-white/50 hover:text-foreground" onClick={() => setMobileOpen(false)}>Modules</a>
           <a href="#pricing" className="block rounded-2xl px-3 py-3 text-sm text-muted-foreground hover:bg-white/50 hover:text-foreground" onClick={() => setMobileOpen(false)}>Pricing</a>
           <a href="#how-it-works" className="block rounded-2xl px-3 py-3 text-sm text-muted-foreground hover:bg-white/50 hover:text-foreground" onClick={() => setMobileOpen(false)}>How It Works</a>

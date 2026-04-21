@@ -24,7 +24,7 @@ const LessonView = () => {
 
   if (isLoading && modules.length === 0) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen overflow-x-hidden bg-background">
         <DashboardHeader />
         <div className="container mx-auto max-w-5xl px-4 py-10">
           <div className="text-center">
@@ -38,7 +38,7 @@ const LessonView = () => {
 
   if (!mod) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen overflow-x-hidden bg-background">
         <DashboardHeader />
         <div className="container mx-auto max-w-5xl px-4 py-10">
           <div className="text-center">
@@ -134,7 +134,7 @@ const LessonView = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen overflow-x-hidden bg-background">
       <DashboardHeader />
 
       <div className="container mx-auto max-w-6xl px-4 py-8 sm:py-10">
@@ -151,7 +151,7 @@ const LessonView = () => {
             <motion.section
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="glass-card relative overflow-hidden rounded-[2rem] border border-border/70 p-5 sm:p-7"
+              className="glass-card relative mx-auto w-full overflow-hidden rounded-[2rem] border border-border/70 p-5 sm:p-7"
             >
               <div className="pointer-events-none absolute inset-x-10 top-0 h-40 rounded-full bg-accent/10 blur-3xl" />
 
@@ -175,14 +175,14 @@ const LessonView = () => {
               </div>
 
               {resolvedVideoUrl ? (
-                <div className="overflow-hidden rounded-[1.9rem] border border-border/70 bg-[#07111e] shadow-[0_28px_80px_-42px_rgba(17,27,44,0.82)]">
+                <div className="max-w-full overflow-hidden rounded-[1.9rem] border border-border/70 bg-[#07111e] shadow-[0_28px_80px_-42px_rgba(17,27,44,0.82)]">
                   <video
                     key={resolvedVideoUrl}
                     controls
                     controlsList="nodownload"
                     preload="metadata"
                     poster={resolvedPosterUrl ?? undefined}
-                    className="aspect-video w-full bg-[#07111e] object-contain"
+                    className="block aspect-video w-full max-w-full bg-[#07111e] object-contain"
                   >
                     <source src={resolvedVideoUrl} type="video/mp4" />
                     Your browser does not support embedded video playback.

@@ -71,11 +71,11 @@ const PricingSection = () => {
                   <div className="mb-6 flex items-start justify-between gap-4">
                     <div>
                       <p className={`mb-2 text-xs font-semibold uppercase tracking-[0.24em] ${isPremium ? "text-white/82 [text-shadow:0_1px_10px_rgba(15,23,42,0.35)]" : "text-accent"}`}>{plan.accessLabel}</p>
-                      <h3 className={`font-heading text-[2.4rem] font-semibold leading-none ${isPremium ? "text-primary-foreground" : "text-foreground"}`}>
+                      <h3 className={`font-heading text-[2rem] font-semibold leading-none sm:text-[2.4rem] ${isPremium ? "text-primary-foreground" : "text-foreground"}`}>
                         {plan.name}
                       </h3>
                       <div className="mt-4 flex items-end gap-2">
-                        <span className={`font-heading text-6xl font-semibold leading-none ${isPremium ? "text-primary-foreground" : "text-foreground"}`}>
+                        <span className={`font-heading text-[3.5rem] font-semibold leading-none sm:text-6xl ${isPremium ? "text-primary-foreground" : "text-foreground"}`}>
                           {plan.priceLabel}
                         </span>
                         <span className={`pb-1 text-lg ${isPremium ? "text-primary-foreground/72" : "text-muted-foreground"}`}>

@@ -129,7 +129,7 @@ const ModulesSection = () => {
                         Module {i + 1}
                       </span>
                     </div>
-                    <p className="mb-3 max-w-sm font-heading text-[2rem] font-semibold leading-[0.96] text-foreground">{mod.title}</p>
+                    <p className="mb-3 max-w-sm font-heading text-[1.6rem] font-semibold leading-[0.98] text-foreground sm:text-[2rem]">{mod.title}</p>
                     <p className="max-w-xl text-sm leading-7 text-muted-foreground">{mod.desc}</p>
                     <div className="mt-8 flex items-center gap-2 text-sm font-semibold text-accent">
                       Explore focus area
@@ -170,7 +170,7 @@ const ModulesSection = () => {
             <DashboardPreviewDialog>
               <button
                 type="button"
-                className="group flex w-full items-center justify-between rounded-[1.5rem] border border-emerald-200 bg-emerald-50 px-5 py-4 text-left shadow-[0_16px_38px_-30px_rgba(22,101,52,0.35)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-emerald-100"
+                className="group flex w-full flex-col items-start gap-3 rounded-[1.5rem] border border-emerald-200 bg-emerald-50 px-5 py-4 text-left shadow-[0_16px_38px_-30px_rgba(22,101,52,0.35)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-emerald-100 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
               >
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-700">Dashboard preview</p>
