@@ -1,7 +1,8 @@
 import { Brain, BookOpen, Calculator, FileText, Languages, Shapes, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { ModuleInfo, ModuleLesson, PracticeTest, QuizQuestion } from "@/data/courseData";
+import type { ModuleInfo, ModuleLesson, PracticeTest, QuizOption, QuizQuestion } from "@/data/courseData";
 import { supabase } from "@/services/supabase/client";
+import { resolveQuestionAssetUrl } from "@/services/storage/question-assets";
 
 type ContentSource = "empty" | "supabase";
 
@@ -36,7 +37,8 @@ interface LessonRow {
 interface QuestionRow {
   id: number;
   question: string;
-  options: string[] | null;
+  question_image_path: string | null;
+  options: unknown[] | null;
   correct_index: number;
   explanation: string;
   sort_order: number;
@@ -75,13 +77,43 @@ const defaultPracticeTestIcon = FileText;
 
 const formatDuration = (minutes: number) => `${minutes} min`;
 
-const mapQuestion = (question: QuestionRow): QuizQuestion => ({
-  id: question.id,
-  question: question.question,
-  options: Array.isArray(question.options) ? question.options : [],
-  correctIndex: question.correct_index,
-  explanation: question.explanation,
-});
+const normalizeOption = (option: unknown): QuizOption => {
+  if (typeof option === "string") {
+    return { text: option, imagePath: null, imageUrl: null };
+  }
+
+  if (option && typeof option === "object") {
+    const entry = option as { text?: unknown; image_path?: unknown };
+    return {
+      text: typeof entry.text === "string" ? entry.text : "",
+      imagePath: typeof entry.image_path === "string" ? entry.image_path : null,
+      imageUrl: null,
+    };
+  }
+
+  return { text: "", imagePath: null, imageUrl: null };
+};
+
+const mapQuestion = async (question: QuestionRow): Promise<QuizQuestion> => {
+  const options = (Array.isArray(question.options) ? question.options : []).map(normalizeOption);
+  const [questionImageUrl, optionImageUrls] = await Promise.all([
+    resolveQuestionAssetUrl(question.question_image_path),
+    Promise.all(options.map((option) => resolveQuestionAssetUrl(option.imagePath))),
+  ]);
+
+  return {
+    id: question.id,
+    question: question.question,
+    questionImagePath: question.question_image_path,
+    questionImageUrl,
+    options: options.map((option, index) => ({
+      ...option,
+      imageUrl: optionImageUrls[index],
+    })),
+    correctIndex: question.correct_index,
+    explanation: question.explanation,
+  };
+};
 
 const mapLesson = (lesson: LessonRow, index: number): ModuleLesson => ({
   id: lesson.id,
@@ -93,7 +125,7 @@ const mapLesson = (lesson: LessonRow, index: number): ModuleLesson => ({
   posterUrl: lesson.poster_path,
 });
 
-const mapModule = (module: ModuleRow): ModuleInfo => ({
+const mapModule = async (module: ModuleRow): Promise<ModuleInfo> => ({
   id: module.id,
   slug: module.slug,
   icon: moduleIconBySlug[module.slug] ?? defaultModuleIcon,
@@ -102,12 +134,14 @@ const mapModule = (module: ModuleRow): ModuleInfo => ({
   lessons: [...(module.lessons ?? [])]
     .sort((a, b) => a.sort_order - b.sort_order)
     .map((lesson, index) => mapLesson(lesson, index)),
-  quiz: [...(module.module_quiz_questions ?? [])]
-    .sort((a, b) => a.sort_order - b.sort_order)
-    .map(mapQuestion),
+  quiz: await Promise.all(
+    [...(module.module_quiz_questions ?? [])]
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map(mapQuestion),
+  ),
 });
 
-const mapPracticeTest = (test: PracticeTestRow): PracticeTest => ({
+const mapPracticeTest = async (test: PracticeTestRow): Promise<PracticeTest> => ({
   id: test.slug,
   dbId: test.id,
   slug: test.slug,
@@ -117,9 +151,11 @@ const mapPracticeTest = (test: PracticeTestRow): PracticeTest => ({
   time: test.time_limit_minutes,
   category: test.category,
   icon: practiceTestIconBySlug[test.slug] ?? defaultPracticeTestIcon,
-  testQuestions: [...(test.practice_test_questions ?? [])]
-    .sort((a, b) => a.sort_order - b.sort_order)
-    .map(mapQuestion),
+  testQuestions: await Promise.all(
+    [...(test.practice_test_questions ?? [])]
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map(mapQuestion),
+  ),
 });
 
 export const getEmptyCourseContent = (): CourseContent => ({
@@ -160,6 +196,7 @@ export const fetchCourseContent = async (): Promise<CourseContent> => {
           module_quiz_questions (
             id,
             question,
+            question_image_path,
             options,
             correct_index,
             explanation,
@@ -179,6 +216,7 @@ export const fetchCourseContent = async (): Promise<CourseContent> => {
           practice_test_questions (
             id,
             question,
+            question_image_path,
             options,
             correct_index,
             explanation,
@@ -208,8 +246,8 @@ export const fetchCourseContent = async (): Promise<CourseContent> => {
     }
 
     return {
-      modules: [...moduleRows].sort((a, b) => a.sort_order - b.sort_order).map(mapModule),
-      practiceTests: practiceTestRows.map(mapPracticeTest),
+      modules: await Promise.all([...moduleRows].sort((a, b) => a.sort_order - b.sort_order).map(mapModule)),
+      practiceTests: await Promise.all(practiceTestRows.map(mapPracticeTest)),
       source: "supabase",
       error: null,
     };

@@ -584,13 +584,20 @@ const PracticeTestView = () => {
                       )}
                       <div className="min-w-0">
                         <p className="font-medium text-foreground text-sm mb-1">{index + 1}. {question.question}</p>
+                        {question.questionImageUrl || question.questionImagePath ? (
+                          <img
+                            src={question.questionImageUrl || question.questionImagePath || ""}
+                            alt={`Question ${index + 1}`}
+                            className="mt-3 max-h-72 rounded-2xl border border-border/60 bg-card object-contain"
+                          />
+                        ) : null}
                         {userAnswer !== null ? (
-                          <p className="text-sm text-muted-foreground">Your answer: {question.options[userAnswer]}</p>
+                          <p className="text-sm text-muted-foreground">Your answer: {question.options[userAnswer]?.text ?? "Unavailable"}</p>
                         ) : (
                           <p className="text-sm text-muted-foreground">No answer submitted.</p>
                         )}
                         {showDetailedFeedback ? (
-                          <p className="text-sm text-green-600 mt-1">Correct answer: {question.options[question.correctIndex]}</p>
+                          <p className="text-sm text-green-600 mt-1">Correct answer: {question.options[question.correctIndex]?.text ?? "Unavailable"}</p>
                         ) : (
                           <p className="text-sm text-muted-foreground mt-1">Correct answer available with premium access.</p>
                         )}
@@ -680,6 +687,13 @@ const PracticeTestView = () => {
                   <div>
                     <p className="text-xs font-semibold tracking-[0.24em] uppercase text-muted-foreground mb-2">Question {currentQ + 1} of {totalQuestions}</p>
                     <h2 className="font-heading text-2xl font-semibold text-foreground leading-tight">{currentQuestion.question}</h2>
+                    {currentQuestion.questionImageUrl || currentQuestion.questionImagePath ? (
+                      <img
+                        src={currentQuestion.questionImageUrl || currentQuestion.questionImagePath || ""}
+                        alt="Question prompt"
+                        className="mt-4 max-h-80 rounded-2xl border border-border/60 bg-card object-contain"
+                      />
+                    ) : null}
                   </div>
                   <div className="rounded-xl bg-muted/80 px-3 py-2 text-sm text-muted-foreground">
                     {answered} answered
@@ -710,7 +724,16 @@ const PracticeTestView = () => {
                       }`}>
                         {String.fromCharCode(65 + index)}
                       </span>
-                      <span className="text-foreground font-medium">{option}</span>
+                      <div className="min-w-0 flex-1">
+                        {option.text ? <span className="text-foreground font-medium">{option.text}</span> : null}
+                        {option.imageUrl || option.imagePath ? (
+                          <img
+                            src={option.imageUrl || option.imagePath || ""}
+                            alt={`Option ${String.fromCharCode(65 + index)}`}
+                            className="mt-3 max-h-48 rounded-2xl border border-border/60 bg-card object-contain"
+                          />
+                        ) : null}
+                      </div>
                     </button>
                   ))}
                 </div>

@@ -241,11 +241,11 @@ const DashboardPreviewDialog = ({ children }: DashboardPreviewDialogProps) => {
                   </p>
                   <div className="space-y-3">
                     {(featuredModule?.quiz[0]?.options ?? []).slice(0, 4).map((option, index) => (
-                      <div key={option} className="w-full text-left rounded-2xl p-4 flex items-center gap-3 border border-border/60 bg-card">
+                      <div key={`${option.text}-${index}`} className="w-full text-left rounded-2xl p-4 flex items-center gap-3 border border-border/60 bg-card">
                         <span className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-semibold flex-shrink-0 bg-muted text-muted-foreground">
                           {String.fromCharCode(65 + index)}
                         </span>
-                        <span className="text-foreground font-medium">{option}</span>
+                        {option.text ? <span className="text-foreground font-medium">{option.text}</span> : null}
                       </div>
                     ))}
                   </div>
@@ -299,7 +299,7 @@ const DashboardPreviewDialog = ({ children }: DashboardPreviewDialogProps) => {
                   <div className="space-y-3">
                     {(featuredTest?.testQuestions[3]?.options ?? featuredTest?.testQuestions[0]?.options ?? []).slice(0, 4).map((option, index) => (
                       <div
-                        key={option}
+                        key={`${option.text}-${index}`}
                         className={`w-full text-left rounded-2xl p-4 flex items-center gap-3 transition-all duration-200 ${
                           index === 1 ? "border-2 border-accent bg-accent/5 shadow-sm" : "border border-border/60 bg-card"
                         }`}
@@ -309,7 +309,7 @@ const DashboardPreviewDialog = ({ children }: DashboardPreviewDialogProps) => {
                         }`}>
                           {String.fromCharCode(65 + index)}
                         </span>
-                        <span className="text-foreground font-medium">{option}</span>
+                        {option.text ? <span className="text-foreground font-medium">{option.text}</span> : null}
                       </div>
                     ))}
                   </div>

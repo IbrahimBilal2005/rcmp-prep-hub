@@ -56,6 +56,12 @@ const parseDurationMinutes = (duration: string) => {
   return Number.isFinite(minutes) && minutes > 0 ? minutes : 10;
 };
 
+const serializeQuestionOptions = (options: QuizQuestion["options"]) =>
+  options.map((option) => ({
+    text: option.text.trim(),
+    image_path: option.imagePath?.trim() || null,
+  }));
+
 const formatLastSeen = (dateString: string | null) => {
   if (!dateString) {
     return "No activity yet";
@@ -267,7 +273,8 @@ export const createModuleQuestion = async (moduleId: number, draft: QuizQuestion
   const { error } = await client.from("module_quiz_questions").insert({
     module_id: moduleId,
     question: draft.question.trim() || "Add a new question prompt.",
-    options: draft.options,
+    question_image_path: draft.questionImagePath?.trim() || null,
+    options: serializeQuestionOptions(draft.options),
     correct_index: draft.correctIndex,
     explanation: draft.explanation.trim() || "Add the explanation for this question.",
     sort_order: sortOrder,
@@ -280,14 +287,18 @@ export const createModuleQuestion = async (moduleId: number, draft: QuizQuestion
 
 export const updateModuleQuestion = async (questionId: number, patch: Partial<QuizQuestion>) => {
   const client = requireSupabase();
-  const updates: Record<string, string | number | string[]> = {};
+  const updates: Record<string, string | number | object[] | null> = {};
 
   if (typeof patch.question === "string") {
     updates.question = patch.question.trim();
   }
 
   if (Array.isArray(patch.options)) {
-    updates.options = patch.options;
+    updates.options = serializeQuestionOptions(patch.options);
+  }
+
+  if ("questionImagePath" in patch) {
+    updates.question_image_path = patch.questionImagePath?.trim() || null;
   }
 
   if (typeof patch.correctIndex === "number") {
@@ -377,7 +388,8 @@ export const createPracticeTestQuestion = async (testId: number, draft: QuizQues
   const { error } = await client.from("practice_test_questions").insert({
     practice_test_id: testId,
     question: draft.question.trim() || "Add a new question prompt.",
-    options: draft.options,
+    question_image_path: draft.questionImagePath?.trim() || null,
+    options: serializeQuestionOptions(draft.options),
     correct_index: draft.correctIndex,
     explanation: draft.explanation.trim() || "Add the explanation for this question.",
     sort_order: sortOrder,
@@ -390,14 +402,18 @@ export const createPracticeTestQuestion = async (testId: number, draft: QuizQues
 
 export const updatePracticeTestQuestion = async (questionId: number, patch: Partial<QuizQuestion>) => {
   const client = requireSupabase();
-  const updates: Record<string, string | number | string[]> = {};
+  const updates: Record<string, string | number | object[] | null> = {};
 
   if (typeof patch.question === "string") {
     updates.question = patch.question.trim();
   }
 
   if (Array.isArray(patch.options)) {
-    updates.options = patch.options;
+    updates.options = serializeQuestionOptions(patch.options);
+  }
+
+  if ("questionImagePath" in patch) {
+    updates.question_image_path = patch.questionImagePath?.trim() || null;
   }
 
   if (typeof patch.correctIndex === "number") {

@@ -422,6 +422,13 @@ const ModuleDetail = () => {
                   </div>
 
                   <h3 className="font-semibold text-lg text-foreground mb-5">{currentQuestion.question}</h3>
+                  {currentQuestion.questionImageUrl || currentQuestion.questionImagePath ? (
+                    <img
+                      src={currentQuestion.questionImageUrl || currentQuestion.questionImagePath || ""}
+                      alt="Question prompt"
+                      className="mb-5 max-h-80 rounded-2xl border border-border/60 bg-card object-contain"
+                    />
+                  ) : null}
 
                   <div className="space-y-3 mb-6">
                     {currentQuestion.options.map((opt, idx) => {
@@ -448,7 +455,16 @@ const ModuleDetail = () => {
                           <span className="w-8 h-8 rounded-lg bg-background flex items-center justify-center text-sm font-semibold text-muted-foreground flex-shrink-0">
                             {String.fromCharCode(65 + idx)}
                           </span>
-                          <span className="text-foreground font-medium">{opt}</span>
+                          <div className="min-w-0 flex-1">
+                            {opt.text ? <span className="text-foreground font-medium">{opt.text}</span> : null}
+                            {opt.imageUrl || opt.imagePath ? (
+                              <img
+                                src={opt.imageUrl || opt.imagePath || ""}
+                                alt={`Option ${String.fromCharCode(65 + idx)}`}
+                                className="mt-3 max-h-48 rounded-2xl border border-border/60 bg-card object-contain"
+                              />
+                            ) : null}
+                          </div>
                           {showExplanation && showDetailedFeedback && idx === currentQuestion.correctIndex && (
                             <CheckCircle className="h-5 w-5 text-green-500 ml-auto flex-shrink-0" />
                           )}

@@ -1,9 +1,17 @@
 import type { LucideIcon } from "lucide-react";
 
+export interface QuizOption {
+  text: string;
+  imagePath: string | null;
+  imageUrl?: string | null;
+}
+
 export interface QuizQuestion {
   id?: number;
   question: string;
-  options: string[];
+  questionImagePath: string | null;
+  questionImageUrl?: string | null;
+  options: QuizOption[];
   correctIndex: number;
   explanation: string;
 }

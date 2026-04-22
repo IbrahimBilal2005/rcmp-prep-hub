@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   FileText,
   Layers3,
+  ImagePlus,
   Pencil,
   Plus,
   ShieldCheck,
@@ -36,7 +37,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
-import type { ModuleInfo, ModuleLesson, PracticeTest, QuizQuestion } from "@/data/courseData";
+import type { ModuleInfo, ModuleLesson, PracticeTest, QuizOption, QuizQuestion } from "@/data/courseData";
 import { clearAuthSession } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import {
@@ -64,12 +65,15 @@ import {
 import { getEmptyCourseContent } from "@/services/content/service";
 import { useCourseContent } from "@/services/content/useCourseContent";
 import { removeLessonAsset, uploadLessonAsset, validateLessonAssetFile } from "@/services/storage/lesson-assets";
+import { removeQuestionAsset, uploadQuestionAsset } from "@/services/storage/question-assets";
 
 type AdminTab = "modules" | "tests" | "users";
+const EMPTY_ADMIN_USERS: AdminUserRecord[] = [];
+const EMPTY_COURSE_CONTENT = getEmptyCourseContent();
 
 const cloneQuestion = (question: QuizQuestion): QuizQuestion => ({
   ...question,
-  options: [...question.options],
+  options: question.options.map((option) => ({ ...option })),
 });
 
 const cloneLesson = (lesson: ModuleLesson): ModuleLesson => ({
@@ -114,20 +118,288 @@ const createNewLessonDraft = (lessonNumber = 1): ModuleLesson => ({
 
 const createNewQuestionDraft = (): QuizQuestion => ({
   question: "Add a new question prompt.",
-  options: ["Option A", "Option B", "Option C", "Option D"],
+  questionImagePath: null,
+  questionImageUrl: null,
+  options: [
+    { text: "Option A", imagePath: null, imageUrl: null },
+    { text: "Option B", imagePath: null, imageUrl: null },
+    { text: "Option C", imagePath: null, imageUrl: null },
+    { text: "Option D", imagePath: null, imageUrl: null },
+  ],
   correctIndex: 0,
   explanation: "Write the explanation learners should see after answering.",
 });
 
+const getOptionLabel = (optionIndex: number) =>
+  optionIndex < 26 ? String.fromCharCode(65 + optionIndex) : `${optionIndex + 1}`;
+
+const clampCorrectIndex = (value: number, optionsLength: number) => {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.min(Math.max(0, value), Math.max(0, optionsLength - 1));
+};
+
+const createEmptyOption = (optionIndex: number): QuizOption => ({
+  text: `Option ${getOptionLabel(optionIndex)}`,
+  imagePath: null,
+  imageUrl: null,
+});
+
+const addOptionToQuestion = (question: QuizQuestion): QuizQuestion => ({
+  ...question,
+  options: [...question.options, createEmptyOption(question.options.length)],
+});
+
+const removeOptionFromQuestion = (question: QuizQuestion, optionIndex: number): QuizQuestion => {
+  if (question.options.length <= 2) {
+    return question;
+  }
+
+  const nextOptions = question.options.filter((_, index) => index !== optionIndex);
+  const nextCorrectIndex =
+    question.correctIndex > optionIndex
+      ? question.correctIndex - 1
+      : question.correctIndex === optionIndex
+        ? Math.max(0, optionIndex - 1)
+        : question.correctIndex;
+
+  return {
+    ...question,
+    options: nextOptions,
+    correctIndex: Math.min(nextCorrectIndex, nextOptions.length - 1),
+  };
+};
+
+interface QuestionAssetControl {
+  busy: boolean;
+  statusText?: string;
+  onUpload?: (file: File | null) => void;
+  onRemove?: () => void;
+}
+
+interface QuestionEditorFieldsProps {
+  question: QuizQuestion;
+  onChange: (patch: Partial<QuizQuestion>) => void;
+  onOptionChange: (optionIndex: number, patch: Partial<QuizOption>) => void;
+  onAddOption: () => void;
+  onRemoveOption: (optionIndex: number) => void;
+  questionAssetControl?: QuestionAssetControl;
+  getOptionAssetControl?: (optionIndex: number) => QuestionAssetControl | undefined;
+  uploadHint?: string;
+}
+
+interface AssetUploadFieldProps {
+  inputId: string;
+  title: string;
+  busy: boolean;
+  statusText?: string;
+  onUpload?: (file: File | null) => void;
+  onRemove?: () => void;
+  previewSrc?: string | null;
+  previewAlt: string;
+  hint?: string;
+}
+
+const AssetUploadField = ({
+  inputId,
+  title,
+  busy,
+  statusText,
+  onUpload,
+  onRemove,
+  previewSrc,
+  previewAlt,
+  hint,
+}: AssetUploadFieldProps) => {
+  const uploadEnabled = Boolean(onUpload) && !busy;
+
+  return (
+    <div className="space-y-2">
+      <input
+        id={inputId}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        onChange={(event) => {
+          onUpload?.(event.target.files?.[0] ?? null);
+          event.currentTarget.value = "";
+        }}
+        disabled={!uploadEnabled}
+        className="sr-only"
+      />
+
+      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+        <label
+          htmlFor={inputId}
+          className={cn(
+            "group flex min-h-[112px] cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border/70 bg-background/45 px-4 py-4 text-center transition-all duration-200",
+            uploadEnabled
+              ? "hover:border-accent/55 hover:bg-accent/5 hover:shadow-sm"
+              : "cursor-not-allowed opacity-60",
+          )}
+        >
+          <ImagePlus className={cn("mb-2 h-5 w-5 text-muted-foreground transition-colors", uploadEnabled ? "group-hover:text-accent" : "")} />
+          <span className="text-sm font-semibold text-foreground">{busy ? "Uploading..." : "Choose file"}</span>
+          <span className="mt-1 text-xs text-muted-foreground">{title}</span>
+        </label>
+
+        {onRemove ? (
+          <Button type="button" variant="outline" size="sm" onClick={onRemove} disabled={busy} className="sm:self-center">
+            Remove image
+          </Button>
+        ) : null}
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        {statusText || hint || "PNG, JPG, or WebP up to 10 MB."}
+      </p>
+
+      {previewSrc ? (
+        <img
+          src={previewSrc}
+          alt={previewAlt}
+          className="max-h-40 rounded-xl border border-border/60 bg-card object-contain"
+        />
+      ) : null}
+    </div>
+  );
+};
+
+const QuestionEditorFields = ({
+  question,
+  onChange,
+  onOptionChange,
+  onAddOption,
+  onRemoveOption,
+  questionAssetControl,
+  getOptionAssetControl,
+  uploadHint,
+}: QuestionEditorFieldsProps) => {
+  const uploadIdBase = useId();
+
+  return (
+  <div className="space-y-3">
+    <div className="space-y-2">
+      <label className="text-sm font-medium text-foreground">Question prompt</label>
+      <Textarea
+        value={question.question}
+        onChange={(event) => onChange({ question: event.target.value })}
+        className="min-h-[96px] bg-background/70"
+      />
+    </div>
+
+    <div className="flex flex-col gap-2 rounded-xl border border-dashed border-border/70 px-3 py-3">
+      <label className="text-sm font-medium text-foreground">Question image</label>
+      <AssetUploadField
+        inputId={`${uploadIdBase}-question-image`}
+        title="Upload question image"
+        busy={questionAssetControl?.busy ?? false}
+        statusText={questionAssetControl?.statusText}
+        onUpload={questionAssetControl?.onUpload}
+        onRemove={questionAssetControl?.onRemove}
+        previewSrc={question.questionImageUrl || question.questionImagePath || null}
+        previewAlt="Question prompt"
+        hint={questionAssetControl?.onUpload ? uploadHint : "Save the question first to enable image upload."}
+      />
+    </div>
+
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <label className="text-sm font-medium text-foreground">Answer options</label>
+        <Button type="button" variant="outline" size="sm" onClick={onAddOption}>
+          <Plus className="h-4 w-4" />
+          Add option
+        </Button>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {question.options.map((option, optionIndex) => {
+          const assetControl = getOptionAssetControl?.(optionIndex);
+
+          return (
+            <div key={`question-option-${optionIndex}`} className="flex h-full flex-col rounded-xl border border-border/60 bg-card/70 p-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <label className="text-sm font-medium text-foreground">Option {getOptionLabel(optionIndex)}</label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onRemoveOption(optionIndex)}
+                  disabled={question.options.length <= 2}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Remove
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <Input
+                  value={option.text}
+                  onChange={(event) => onOptionChange(optionIndex, { text: event.target.value })}
+                  className="bg-background/70"
+                  placeholder={`Option ${getOptionLabel(optionIndex)} text or leave blank for image only`}
+                />
+
+                <div className="flex flex-col gap-2 rounded-xl border border-dashed border-border/70 px-3 py-3">
+                  <label className="text-sm font-medium text-foreground">Option image</label>
+                  <AssetUploadField
+                    inputId={`${uploadIdBase}-option-${optionIndex}`}
+                    title={`Upload image for option ${getOptionLabel(optionIndex)}`}
+                    busy={assetControl?.busy ?? false}
+                    statusText={assetControl?.statusText}
+                    onUpload={assetControl?.onUpload}
+                    onRemove={assetControl?.onRemove}
+                    previewSrc={option.imageUrl || option.imagePath || null}
+                    previewAlt={`Option ${getOptionLabel(optionIndex)}`}
+                    hint={assetControl?.onUpload ? uploadHint : "Save the question first to enable image upload."}
+                  />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+
+    <div className="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)]">
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-foreground">Correct option index</label>
+        <Input
+          type="number"
+          min={0}
+          max={question.options.length - 1}
+          value={question.correctIndex}
+          onChange={(event) =>
+            onChange({
+              correctIndex: clampCorrectIndex(Number(event.target.value), question.options.length),
+            })
+          }
+          className="bg-background/70"
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-foreground">Explanation</label>
+        <Textarea
+          value={question.explanation}
+          onChange={(event) => onChange({ explanation: event.target.value })}
+          className="min-h-[96px] bg-background/70"
+        />
+      </div>
+    </div>
+  </div>
+  );
+};
+
 const AdminDashboard = () => {
   const queryClient = useQueryClient();
   const { data: courseContent } = useCourseContent();
-  const { data: adminUsers = [] } = useQuery({
+  const { data: adminUsers = EMPTY_ADMIN_USERS } = useQuery({
     queryKey: ["admin-users"],
     queryFn: fetchAdminUsers,
     staleTime: 60_000,
   });
-  const resolvedCourseContent = courseContent ?? getEmptyCourseContent();
+  const resolvedCourseContent = courseContent ?? EMPTY_COURSE_CONTENT;
   const modules = resolvedCourseContent.modules;
   const practiceTests = resolvedCourseContent.practiceTests;
   const navigate = useNavigate();
@@ -162,6 +434,10 @@ const AdminDashboard = () => {
     await queryClient.refetchQueries({ queryKey: ["admin-users"] });
   };
 
+  const syncCourseContentInBackground = () => {
+    void queryClient.invalidateQueries({ queryKey: ["course-content"] });
+  };
+
   const showMutationError = (title: string, error: unknown) => {
     toast({
       title,
@@ -169,6 +445,12 @@ const AdminDashboard = () => {
       variant: "destructive",
     });
   };
+
+  const getQuestionAssetKey = (
+    ownerType: "module-question" | "test-question",
+    questionId: number,
+    slot: string,
+  ) => `${ownerType}-${questionId}-${slot}`;
 
   const handleLessonAssetUpload = async (
     lessonIndex: number,
@@ -345,10 +627,142 @@ const AdminDashboard = () => {
     );
   };
 
-  const updateModuleQuestionOption = (questionIndex: number, optionIndex: number, value: string) => {
+  const updateModuleQuestionOption = (questionIndex: number, optionIndex: number, patch: Partial<QuizOption>) => {
     const nextOptions = [...(selectedModule?.quiz[questionIndex]?.options ?? [])];
-    nextOptions[optionIndex] = value;
+    nextOptions[optionIndex] = { ...nextOptions[optionIndex], ...patch };
     updateModuleQuestion(questionIndex, { options: nextOptions });
+  };
+
+  const addModuleQuestionOption = (questionIndex: number) => {
+    const question = selectedModule.quiz[questionIndex];
+    if (!question) {
+      return;
+    }
+
+    updateModuleQuestion(questionIndex, addOptionToQuestion(question));
+  };
+
+  const removeModuleQuestionOption = (questionIndex: number, optionIndex: number) => {
+    const question = selectedModule.quiz[questionIndex];
+    if (!question) {
+      return;
+    }
+
+    updateModuleQuestion(questionIndex, removeOptionFromQuestion(question, optionIndex));
+  };
+
+  const updateNewModuleQuestionOption = (optionIndex: number, patch: Partial<QuizOption>) => {
+    setNewModuleQuestionDraft((current) => {
+      const nextOptions = [...current.options];
+      nextOptions[optionIndex] = { ...nextOptions[optionIndex], ...patch };
+      return { ...current, options: nextOptions };
+    });
+  };
+
+  const handleModuleQuestionAssetUpload = async (questionIndex: number, file: File | null, optionIndex?: number) => {
+    if (!file) {
+      return;
+    }
+
+    const question = selectedModule.quiz[questionIndex];
+
+    if (!question?.id) {
+      showMutationError("Unable to upload image", new Error("Create the question first so it has a database id."));
+      return;
+    }
+
+    const slot = optionIndex === undefined ? "prompt" : `option-${optionIndex}`;
+    const assetKey = getQuestionAssetKey("module-question", question.id, slot);
+    setUploadingAssetKey(assetKey);
+    setAssetStatusText((current) => ({ ...current, [assetKey]: "Uploading question image..." }));
+
+    try {
+      const previousPath = optionIndex === undefined
+        ? question.questionImagePath
+        : question.options[optionIndex]?.imagePath ?? null;
+      const nextPath = await uploadQuestionAsset({
+        ownerType: "module",
+        ownerId: selectedModule.id,
+        questionId: question.id,
+        slot,
+        file,
+        previousPath,
+      });
+      const nextQuestion =
+        optionIndex === undefined
+          ? { ...question, questionImagePath: nextPath, questionImageUrl: URL.createObjectURL(file) }
+          : {
+              ...question,
+              options: question.options.map((option, index) =>
+                index === optionIndex ? { ...option, imagePath: nextPath, imageUrl: URL.createObjectURL(file) } : option,
+              ),
+            };
+
+      await updateModuleQuestionRecord(question.id, nextQuestion);
+      updateModuleQuestion(questionIndex, nextQuestion);
+      setUploadedAssetLabels((current) => ({ ...current, [assetKey]: file.name }));
+      setAssetStatusText((current) => ({ ...current, [assetKey]: "Upload complete" }));
+      setUploadingAssetKey(null);
+      syncCourseContentInBackground();
+      toast({ title: "Question image uploaded", description: `${file.name} is now linked to this module question.` });
+    } catch (error) {
+      setAssetStatusText((current) => ({
+        ...current,
+        [assetKey]: error instanceof Error ? error.message : "Upload failed",
+      }));
+      showMutationError("Unable to upload image", error);
+    } finally {
+      setUploadingAssetKey((current) => (current === assetKey ? null : current));
+    }
+  };
+
+  const handleRemoveModuleQuestionAsset = async (questionIndex: number, optionIndex?: number) => {
+    const question = selectedModule.quiz[questionIndex];
+
+    if (!question?.id) {
+      showMutationError("Unable to remove image", new Error("This question is missing its database id."));
+      return;
+    }
+
+    const slot = optionIndex === undefined ? "prompt" : `option-${optionIndex}`;
+    const assetKey = getQuestionAssetKey("module-question", question.id, slot);
+    const currentPath = optionIndex === undefined
+      ? question.questionImagePath
+      : question.options[optionIndex]?.imagePath ?? null;
+
+    if (!currentPath) {
+      return;
+    }
+
+    setUploadingAssetKey(assetKey);
+    setAssetStatusText((current) => ({ ...current, [assetKey]: "Removing question image..." }));
+
+    try {
+      await removeQuestionAsset(currentPath);
+      const nextQuestion =
+        optionIndex === undefined
+          ? { ...question, questionImagePath: null, questionImageUrl: null }
+          : {
+              ...question,
+              options: question.options.map((option, index) =>
+                index === optionIndex ? { ...option, imagePath: null, imageUrl: null } : option,
+              ),
+            };
+      await updateModuleQuestionRecord(question.id, nextQuestion);
+      updateModuleQuestion(questionIndex, nextQuestion);
+      setAssetStatusText((current) => ({ ...current, [assetKey]: "Image removed" }));
+      setUploadingAssetKey(null);
+      syncCourseContentInBackground();
+      toast({ title: "Question image removed", description: "The image was removed from this module question." });
+    } catch (error) {
+      setAssetStatusText((current) => ({
+        ...current,
+        [assetKey]: error instanceof Error ? error.message : "Removal failed",
+      }));
+      showMutationError("Unable to remove image", error);
+    } finally {
+      setUploadingAssetKey((current) => (current === assetKey ? null : current));
+    }
   };
 
   const addModule = async () => {
@@ -456,10 +870,142 @@ const AdminDashboard = () => {
     );
   };
 
-  const updateTestQuestionOption = (questionIndex: number, optionIndex: number, value: string) => {
+  const updateTestQuestionOption = (questionIndex: number, optionIndex: number, patch: Partial<QuizOption>) => {
     const nextOptions = [...(selectedTest?.testQuestions[questionIndex]?.options ?? [])];
-    nextOptions[optionIndex] = value;
+    nextOptions[optionIndex] = { ...nextOptions[optionIndex], ...patch };
     updateTestQuestion(questionIndex, { options: nextOptions });
+  };
+
+  const addTestQuestionOption = (questionIndex: number) => {
+    const question = selectedTest.testQuestions[questionIndex];
+    if (!question) {
+      return;
+    }
+
+    updateTestQuestion(questionIndex, addOptionToQuestion(question));
+  };
+
+  const removeTestQuestionOption = (questionIndex: number, optionIndex: number) => {
+    const question = selectedTest.testQuestions[questionIndex];
+    if (!question) {
+      return;
+    }
+
+    updateTestQuestion(questionIndex, removeOptionFromQuestion(question, optionIndex));
+  };
+
+  const updateNewTestQuestionOption = (optionIndex: number, patch: Partial<QuizOption>) => {
+    setNewTestQuestionDraft((current) => {
+      const nextOptions = [...current.options];
+      nextOptions[optionIndex] = { ...nextOptions[optionIndex], ...patch };
+      return { ...current, options: nextOptions };
+    });
+  };
+
+  const handleTestQuestionAssetUpload = async (questionIndex: number, file: File | null, optionIndex?: number) => {
+    if (!file) {
+      return;
+    }
+
+    const question = selectedTest.testQuestions[questionIndex];
+
+    if (!question?.id || !selectedTest.dbId) {
+      showMutationError("Unable to upload image", new Error("Create the question first so it has a database id."));
+      return;
+    }
+
+    const slot = optionIndex === undefined ? "prompt" : `option-${optionIndex}`;
+    const assetKey = getQuestionAssetKey("test-question", question.id, slot);
+    setUploadingAssetKey(assetKey);
+    setAssetStatusText((current) => ({ ...current, [assetKey]: "Uploading question image..." }));
+
+    try {
+      const previousPath = optionIndex === undefined
+        ? question.questionImagePath
+        : question.options[optionIndex]?.imagePath ?? null;
+      const nextPath = await uploadQuestionAsset({
+        ownerType: "test",
+        ownerId: selectedTest.dbId,
+        questionId: question.id,
+        slot,
+        file,
+        previousPath,
+      });
+      const nextQuestion =
+        optionIndex === undefined
+          ? { ...question, questionImagePath: nextPath, questionImageUrl: URL.createObjectURL(file) }
+          : {
+              ...question,
+              options: question.options.map((option, index) =>
+                index === optionIndex ? { ...option, imagePath: nextPath, imageUrl: URL.createObjectURL(file) } : option,
+              ),
+            };
+
+      await updatePracticeTestQuestionRecord(question.id, nextQuestion);
+      updateTestQuestion(questionIndex, nextQuestion);
+      setUploadedAssetLabels((current) => ({ ...current, [assetKey]: file.name }));
+      setAssetStatusText((current) => ({ ...current, [assetKey]: "Upload complete" }));
+      setUploadingAssetKey(null);
+      syncCourseContentInBackground();
+      toast({ title: "Question image uploaded", description: `${file.name} is now linked to this test question.` });
+    } catch (error) {
+      setAssetStatusText((current) => ({
+        ...current,
+        [assetKey]: error instanceof Error ? error.message : "Upload failed",
+      }));
+      showMutationError("Unable to upload image", error);
+    } finally {
+      setUploadingAssetKey((current) => (current === assetKey ? null : current));
+    }
+  };
+
+  const handleRemoveTestQuestionAsset = async (questionIndex: number, optionIndex?: number) => {
+    const question = selectedTest.testQuestions[questionIndex];
+
+    if (!question?.id) {
+      showMutationError("Unable to remove image", new Error("This question is missing its database id."));
+      return;
+    }
+
+    const slot = optionIndex === undefined ? "prompt" : `option-${optionIndex}`;
+    const assetKey = getQuestionAssetKey("test-question", question.id, slot);
+    const currentPath = optionIndex === undefined
+      ? question.questionImagePath
+      : question.options[optionIndex]?.imagePath ?? null;
+
+    if (!currentPath) {
+      return;
+    }
+
+    setUploadingAssetKey(assetKey);
+    setAssetStatusText((current) => ({ ...current, [assetKey]: "Removing question image..." }));
+
+    try {
+      await removeQuestionAsset(currentPath);
+      const nextQuestion =
+        optionIndex === undefined
+          ? { ...question, questionImagePath: null, questionImageUrl: null }
+          : {
+              ...question,
+              options: question.options.map((option, index) =>
+                index === optionIndex ? { ...option, imagePath: null, imageUrl: null } : option,
+              ),
+            };
+      await updatePracticeTestQuestionRecord(question.id, nextQuestion);
+      updateTestQuestion(questionIndex, nextQuestion);
+      setAssetStatusText((current) => ({ ...current, [assetKey]: "Image removed" }));
+      setUploadingAssetKey(null);
+      syncCourseContentInBackground();
+      toast({ title: "Question image removed", description: "The image was removed from this timed-test question." });
+    } catch (error) {
+      setAssetStatusText((current) => ({
+        ...current,
+        [assetKey]: error instanceof Error ? error.message : "Removal failed",
+      }));
+      showMutationError("Unable to remove image", error);
+    } finally {
+      setUploadingAssetKey((current) => (current === assetKey ? null : current));
+    }
   };
 
   const saveSelectedTest = async () => {
@@ -841,7 +1387,7 @@ const AdminDashboard = () => {
                         Add lecture
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-3xl rounded-[1.75rem] border-border/70 p-6 sm:p-7">
+                    <DialogContent className="max-h-[88vh] max-w-5xl overflow-y-auto rounded-[1.75rem] border-border/70 p-5 sm:p-6">
                       <DialogHeader>
                         <DialogTitle className="font-heading text-2xl text-foreground">Create lecture</DialogTitle>
                         <DialogDescription>Add the lecture metadata before it appears in the module list.</DialogDescription>
@@ -1089,36 +1635,14 @@ const AdminDashboard = () => {
                         <DialogDescription>Add the prompt, answers, and explanation before it is saved to the quiz bank.</DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-foreground">Question prompt</label>
-                          <Textarea value={newModuleQuestionDraft.question} onChange={(event) => setNewModuleQuestionDraft((current) => ({ ...current, question: event.target.value }))} className="min-h-[120px] bg-background/70" />
-                        </div>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          {newModuleQuestionDraft.options.map((option, optionIndex) => (
-                            <div key={`new-module-option-${optionIndex}`} className="space-y-2">
-                              <label className="text-sm font-medium text-foreground">Option {String.fromCharCode(65 + optionIndex)}</label>
-                              <Input
-                                value={option}
-                                onChange={(event) => {
-                                  const nextOptions = [...newModuleQuestionDraft.options];
-                                  nextOptions[optionIndex] = event.target.value;
-                                  setNewModuleQuestionDraft((current) => ({ ...current, options: nextOptions }));
-                                }}
-                                className="bg-background/70"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                        <div className="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)]">
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium text-foreground">Correct option index</label>
-                            <Input type="number" min={0} max={newModuleQuestionDraft.options.length - 1} value={newModuleQuestionDraft.correctIndex} onChange={(event) => setNewModuleQuestionDraft((current) => ({ ...current, correctIndex: Number(event.target.value) || 0 }))} className="bg-background/70" />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium text-foreground">Explanation</label>
-                            <Textarea value={newModuleQuestionDraft.explanation} onChange={(event) => setNewModuleQuestionDraft((current) => ({ ...current, explanation: event.target.value }))} className="min-h-[120px] bg-background/70" />
-                          </div>
-                        </div>
+                        <QuestionEditorFields
+                          question={newModuleQuestionDraft}
+                          onChange={(patch) => setNewModuleQuestionDraft((current) => ({ ...current, ...patch }))}
+                          onOptionChange={updateNewModuleQuestionOption}
+                          onAddOption={() => setNewModuleQuestionDraft((current) => addOptionToQuestion(current))}
+                          onRemoveOption={(optionIndex) => setNewModuleQuestionDraft((current) => removeOptionFromQuestion(current, optionIndex))}
+                          uploadHint="Create the question first if you want to upload local images."
+                        />
                         <div className="flex justify-end gap-3">
                           <Button variant="outline" onClick={() => setCreateModuleQuestionOpen(false)}>Cancel</Button>
                           <Button variant="hero" onClick={addQuizQuestionToSelectedModule}>Create question</Button>
@@ -1135,7 +1659,7 @@ const AdminDashboard = () => {
                         <div className="min-w-0">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent">Question {questionIndex + 1}</p>
                           <p className="mt-1 font-semibold text-foreground">{question.question}</p>
-                          <p className="mt-2 text-xs text-muted-foreground">Correct answer: {String.fromCharCode(65 + question.correctIndex)}</p>
+                          <p className="mt-2 text-xs text-muted-foreground">Correct answer: {getOptionLabel(question.correctIndex)}</p>
                           <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted-foreground">{question.explanation}</p>
                         </div>
 
@@ -1146,7 +1670,7 @@ const AdminDashboard = () => {
                               Edit
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="max-w-3xl rounded-[1.75rem] border-border/70 p-6 sm:p-7">
+                          <DialogContent className="max-h-[88vh] max-w-5xl overflow-y-auto rounded-[1.75rem] border-border/70 p-5 sm:p-6">
                             <DialogHeader>
                               <DialogTitle className="font-heading text-2xl text-foreground">Edit module question</DialogTitle>
                               <DialogDescription>
@@ -1154,35 +1678,25 @@ const AdminDashboard = () => {
                               </DialogDescription>
                             </DialogHeader>
                             <div className="space-y-4">
-                              <div className="space-y-2">
-                                <label className="text-sm font-medium text-foreground">Question prompt</label>
-                                <Textarea value={question.question} onChange={(event) => updateModuleQuestion(questionIndex, { question: event.target.value })} className="min-h-[120px] bg-background/70" />
-                              </div>
-                              <div className="grid gap-3 sm:grid-cols-2">
-                                {question.options.map((option, optionIndex) => (
-                                  <div key={`${selectedModule.id}-${questionIndex}-${optionIndex}`} className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Option {String.fromCharCode(65 + optionIndex)}</label>
-                                    <Input value={option} onChange={(event) => updateModuleQuestionOption(questionIndex, optionIndex, event.target.value)} className="bg-background/70" />
-                                  </div>
-                                ))}
-                              </div>
-                              <div className="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)]">
-                                <div className="space-y-2">
-                                  <label className="text-sm font-medium text-foreground">Correct option index</label>
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    max={question.options.length - 1}
-                                    value={question.correctIndex}
-                                    onChange={(event) => updateModuleQuestion(questionIndex, { correctIndex: Number(event.target.value) || 0 })}
-                                    className="bg-background/70"
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <label className="text-sm font-medium text-foreground">Explanation</label>
-                                  <Textarea value={question.explanation} onChange={(event) => updateModuleQuestion(questionIndex, { explanation: event.target.value })} className="min-h-[120px] bg-background/70" />
-                                </div>
-                              </div>
+                              <QuestionEditorFields
+                                question={question}
+                                onChange={(patch) => updateModuleQuestion(questionIndex, patch)}
+                                onOptionChange={(optionIndex, patch) => updateModuleQuestionOption(questionIndex, optionIndex, patch)}
+                                onAddOption={() => addModuleQuestionOption(questionIndex)}
+                                onRemoveOption={(optionIndex) => removeModuleQuestionOption(questionIndex, optionIndex)}
+                                questionAssetControl={{
+                                  busy: uploadingAssetKey === getQuestionAssetKey("module-question", question.id ?? -1, "prompt"),
+                                  statusText: assetStatusText[getQuestionAssetKey("module-question", question.id ?? -1, "prompt")],
+                                  onUpload: question.id ? (file) => { void handleModuleQuestionAssetUpload(questionIndex, file); } : undefined,
+                                  onRemove: question.questionImagePath ? () => { void handleRemoveModuleQuestionAsset(questionIndex); } : undefined,
+                                }}
+                                getOptionAssetControl={(optionIndex) => ({
+                                  busy: uploadingAssetKey === getQuestionAssetKey("module-question", question.id ?? -1, `option-${optionIndex}`),
+                                  statusText: assetStatusText[getQuestionAssetKey("module-question", question.id ?? -1, `option-${optionIndex}`)],
+                                  onUpload: question.id ? (file) => { void handleModuleQuestionAssetUpload(questionIndex, file, optionIndex); } : undefined,
+                                  onRemove: question.options[optionIndex]?.imagePath ? () => { void handleRemoveModuleQuestionAsset(questionIndex, optionIndex); } : undefined,
+                                })}
+                              />
                               <div className="flex justify-between gap-3">
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
@@ -1388,42 +1902,20 @@ const AdminDashboard = () => {
                         Add question
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-3xl rounded-[1.75rem] border-border/70 p-6 sm:p-7">
+                    <DialogContent className="max-h-[88vh] max-w-5xl overflow-y-auto rounded-[1.75rem] border-border/70 p-5 sm:p-6">
                       <DialogHeader>
                         <DialogTitle className="font-heading text-2xl text-foreground">Create test question</DialogTitle>
                         <DialogDescription>Add the timed-test prompt, answer options, and explanation before saving it.</DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-foreground">Question prompt</label>
-                          <Textarea value={newTestQuestionDraft.question} onChange={(event) => setNewTestQuestionDraft((current) => ({ ...current, question: event.target.value }))} className="min-h-[120px] bg-background/70" />
-                        </div>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          {newTestQuestionDraft.options.map((option, optionIndex) => (
-                            <div key={`new-test-option-${optionIndex}`} className="space-y-2">
-                              <label className="text-sm font-medium text-foreground">Option {String.fromCharCode(65 + optionIndex)}</label>
-                              <Input
-                                value={option}
-                                onChange={(event) => {
-                                  const nextOptions = [...newTestQuestionDraft.options];
-                                  nextOptions[optionIndex] = event.target.value;
-                                  setNewTestQuestionDraft((current) => ({ ...current, options: nextOptions }));
-                                }}
-                                className="bg-background/70"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                        <div className="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)]">
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium text-foreground">Correct option index</label>
-                            <Input type="number" min={0} max={newTestQuestionDraft.options.length - 1} value={newTestQuestionDraft.correctIndex} onChange={(event) => setNewTestQuestionDraft((current) => ({ ...current, correctIndex: Number(event.target.value) || 0 }))} className="bg-background/70" />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium text-foreground">Explanation</label>
-                            <Textarea value={newTestQuestionDraft.explanation} onChange={(event) => setNewTestQuestionDraft((current) => ({ ...current, explanation: event.target.value }))} className="min-h-[120px] bg-background/70" />
-                          </div>
-                        </div>
+                        <QuestionEditorFields
+                          question={newTestQuestionDraft}
+                          onChange={(patch) => setNewTestQuestionDraft((current) => ({ ...current, ...patch }))}
+                          onOptionChange={updateNewTestQuestionOption}
+                          onAddOption={() => setNewTestQuestionDraft((current) => addOptionToQuestion(current))}
+                          onRemoveOption={(optionIndex) => setNewTestQuestionDraft((current) => removeOptionFromQuestion(current, optionIndex))}
+                          uploadHint="Create the question first if you want to upload local images."
+                        />
                         <div className="flex justify-end gap-3">
                           <Button variant="outline" onClick={() => setCreateTestQuestionOpen(false)}>Cancel</Button>
                           <Button variant="hero" onClick={addQuestionToSelectedTest}>Create question</Button>
@@ -1440,7 +1932,7 @@ const AdminDashboard = () => {
                         <div className="min-w-0">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent">Question {questionIndex + 1}</p>
                           <p className="mt-1 font-semibold text-foreground">{question.question}</p>
-                          <p className="mt-2 text-xs text-muted-foreground">Correct answer: {String.fromCharCode(65 + question.correctIndex)}</p>
+                          <p className="mt-2 text-xs text-muted-foreground">Correct answer: {getOptionLabel(question.correctIndex)}</p>
                           <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted-foreground">{question.explanation}</p>
                         </div>
 
@@ -1451,7 +1943,7 @@ const AdminDashboard = () => {
                               Edit
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="max-w-3xl rounded-[1.75rem] border-border/70 p-6 sm:p-7">
+                          <DialogContent className="max-h-[88vh] max-w-5xl overflow-y-auto rounded-[1.75rem] border-border/70 p-5 sm:p-6">
                             <DialogHeader>
                               <DialogTitle className="font-heading text-2xl text-foreground">Edit test question</DialogTitle>
                               <DialogDescription>
@@ -1459,35 +1951,25 @@ const AdminDashboard = () => {
                               </DialogDescription>
                             </DialogHeader>
                             <div className="space-y-4">
-                              <div className="space-y-2">
-                                <label className="text-sm font-medium text-foreground">Question prompt</label>
-                                <Textarea value={question.question} onChange={(event) => updateTestQuestion(questionIndex, { question: event.target.value })} className="min-h-[120px] bg-background/70" />
-                              </div>
-                              <div className="grid gap-3 sm:grid-cols-2">
-                                {question.options.map((option, optionIndex) => (
-                                  <div key={`${selectedTest.id}-${questionIndex}-${optionIndex}`} className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Option {String.fromCharCode(65 + optionIndex)}</label>
-                                    <Input value={option} onChange={(event) => updateTestQuestionOption(questionIndex, optionIndex, event.target.value)} className="bg-background/70" />
-                                  </div>
-                                ))}
-                              </div>
-                              <div className="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)]">
-                                <div className="space-y-2">
-                                  <label className="text-sm font-medium text-foreground">Correct option index</label>
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    max={question.options.length - 1}
-                                    value={question.correctIndex}
-                                    onChange={(event) => updateTestQuestion(questionIndex, { correctIndex: Number(event.target.value) || 0 })}
-                                    className="bg-background/70"
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <label className="text-sm font-medium text-foreground">Explanation</label>
-                                  <Textarea value={question.explanation} onChange={(event) => updateTestQuestion(questionIndex, { explanation: event.target.value })} className="min-h-[120px] bg-background/70" />
-                                </div>
-                              </div>
+                              <QuestionEditorFields
+                                question={question}
+                                onChange={(patch) => updateTestQuestion(questionIndex, patch)}
+                                onOptionChange={(optionIndex, patch) => updateTestQuestionOption(questionIndex, optionIndex, patch)}
+                                onAddOption={() => addTestQuestionOption(questionIndex)}
+                                onRemoveOption={(optionIndex) => removeTestQuestionOption(questionIndex, optionIndex)}
+                                questionAssetControl={{
+                                  busy: uploadingAssetKey === getQuestionAssetKey("test-question", question.id ?? -1, "prompt"),
+                                  statusText: assetStatusText[getQuestionAssetKey("test-question", question.id ?? -1, "prompt")],
+                                  onUpload: question.id ? (file) => { void handleTestQuestionAssetUpload(questionIndex, file); } : undefined,
+                                  onRemove: question.questionImagePath ? () => { void handleRemoveTestQuestionAsset(questionIndex); } : undefined,
+                                }}
+                                getOptionAssetControl={(optionIndex) => ({
+                                  busy: uploadingAssetKey === getQuestionAssetKey("test-question", question.id ?? -1, `option-${optionIndex}`),
+                                  statusText: assetStatusText[getQuestionAssetKey("test-question", question.id ?? -1, `option-${optionIndex}`)],
+                                  onUpload: question.id ? (file) => { void handleTestQuestionAssetUpload(questionIndex, file, optionIndex); } : undefined,
+                                  onRemove: question.options[optionIndex]?.imagePath ? () => { void handleRemoveTestQuestionAsset(questionIndex, optionIndex); } : undefined,
+                                })}
+                              />
                               <div className="flex justify-between gap-3">
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
