@@ -39,7 +39,8 @@ interface QuestionRow {
   question: string;
   question_image_path: string | null;
   options: unknown[] | null;
-  correct_index: number;
+  correct_index: number | null;
+  correct_indexes: number[] | null;
   explanation: string;
   sort_order: number;
 }
@@ -111,6 +112,9 @@ const mapQuestion = async (question: QuestionRow): Promise<QuizQuestion> => {
       imageUrl: optionImageUrls[index],
     })),
     correctIndex: question.correct_index,
+    correctIndexes: Array.isArray(question.correct_indexes)
+      ? question.correct_indexes.filter((value): value is number => Number.isInteger(value))
+      : [],
     explanation: question.explanation,
   };
 };
@@ -199,6 +203,7 @@ export const fetchCourseContent = async (): Promise<CourseContent> => {
             question_image_path,
             options,
             correct_index,
+            correct_indexes,
             explanation,
             sort_order
           )
@@ -219,6 +224,7 @@ export const fetchCourseContent = async (): Promise<CourseContent> => {
             question_image_path,
             options,
             correct_index,
+            correct_indexes,
             explanation,
             sort_order
           )

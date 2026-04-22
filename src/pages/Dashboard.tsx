@@ -255,7 +255,7 @@ const Dashboard = () => {
   })();
 
   const stats = [
-    { label: "Modules Completed", value: `${completedModuleCount}/7`, icon: BookOpen },
+    { label: "Modules Completed", value: `${completedModuleCount}/${modules.length}`, icon: BookOpen },
     { label: "Tests Taken", value: `${totalAttempts}`, icon: BarChart3 },
     { label: "Tracked Best Avg", value: bestScoreCoverage > 0 ? `${Math.round(averageBestScore / bestScoreCoverage)}%` : "--", icon: Trophy },
     { label: "Access Window", value: "6 months", icon: Shield },

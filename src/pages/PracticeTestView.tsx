@@ -7,6 +7,8 @@ import {
   CheckCircle,
   ChevronRight,
   Clock3,
+  Eye,
+  EyeOff,
   Play,
   RotateCcw,
   Target,
@@ -28,6 +30,7 @@ import {
   savePracticeAttempt,
   type PracticeAttemptRecord,
 } from "@/lib/practiceTestStorage";
+import { formatCorrectAnswerText, isCorrectAnswer } from "@/lib/quiz";
 import { getEmptyCourseContent } from "@/services/content/service";
 import { useCourseContent } from "@/services/content/useCourseContent";
 import { persistPracticeAttempt } from "@/services/progress/supabase-sync";
@@ -52,6 +55,27 @@ const formatAttemptDate = (isoString: string) =>
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(isoString));
+
+const parseMemoryQuestion = (questionText: string) => {
+  const normalized = questionText.trim();
+
+  if (!normalized.toLowerCase().startsWith("study material:")) {
+    return null;
+  }
+
+  const questionMarkerIndex = normalized.toLowerCase().lastIndexOf(" question:");
+  if (questionMarkerIndex === -1) {
+    return {
+      studyMaterial: normalized.replace(/^study material:\s*/i, "").trim(),
+      prompt: normalized,
+    };
+  }
+
+  return {
+    studyMaterial: normalized.slice("Study material:".length, questionMarkerIndex).trim(),
+    prompt: normalized.slice(questionMarkerIndex + " question:".length).trim(),
+  };
+};
 
 interface ProgressPanelProps {
   answers: Array<number | null>;
@@ -175,6 +199,7 @@ const PracticeTestView = () => {
   const [attemptHistory, setAttemptHistory] = useState<PracticeAttemptRecord[]>([]);
   const [startedAt, setStartedAt] = useState<string | null>(null);
   const [reviewMeta, setReviewMeta] = useState<{ completedAt: string; timedOut: boolean } | null>(null);
+  const [showMemoryStudyMaterial, setShowMemoryStudyMaterial] = useState(true);
 
   const persistedAttemptIdRef = useRef<string | null>(null);
 
@@ -190,6 +215,7 @@ const PracticeTestView = () => {
     setShowExplanation(null);
     setStartedAt(null);
     setReviewMeta(null);
+    setShowMemoryStudyMaterial(true);
     persistedAttemptIdRef.current = null;
     setAttemptHistory(getPracticeAttempts(test.id));
   }, [test]);
@@ -213,10 +239,12 @@ const PracticeTestView = () => {
   const totalQuestions = questions.length;
   const totalDurationSeconds = test?.time ? test.time * 60 : 0;
   const answered = answers.filter((answer) => answer !== null).length;
-  const score = answers.reduce((total, answer, index) => total + (answer === questions[index].correctIndex ? 1 : 0), 0);
+  const score = answers.reduce((total, answer, index) => total + (isCorrectAnswer(questions[index], answer) ? 1 : 0), 0);
   const percentage = totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0;
   const durationSeconds = Math.min(totalDurationSeconds, Math.max(totalDurationSeconds - timeLeft, 0));
   const currentQuestion = questions[currentQ];
+  const parsedMemoryQuestion = currentQuestion ? parseMemoryQuestion(currentQuestion.question) : null;
+  const isMemoryTest = test.slug === "memory-quotient-practice" || test.category.toLowerCase() === "memory";
   const timeWarning = timeLeft < 60 && phase === "active";
   const bestAttempt = test ? getBestPracticeAttempt(test.id) : null;
   const questionUnlocked = test ? isPreviewTestQuestionUnlocked(test.id, currentQ) : false;
@@ -289,6 +317,7 @@ const PracticeTestView = () => {
     setShowExplanation(null);
     setStartedAt(null);
     setReviewMeta(null);
+    setShowMemoryStudyMaterial(true);
     persistedAttemptIdRef.current = null;
   };
 
@@ -353,7 +382,7 @@ const PracticeTestView = () => {
               {locked && (
                 <LockedMask
                   title="Locked timed test"
-                  body="This screen stays identical to the real product, but the test remains blurred and unavailable until full access is unlocked."
+                  body="This timed test is available with full access."
                 />
               )}
 
@@ -378,56 +407,16 @@ const PracticeTestView = () => {
                   </div>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-3 mb-8">
-                  <div className="rounded-2xl bg-card border border-border/60 p-4">
-                    <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground mb-2">Timed format</p>
-                    <p className="text-sm text-foreground leading-relaxed">Practice tests now mirror exam pressure. The timer starts only when you launch the attempt.</p>
-                  </div>
-                  <div className="rounded-2xl bg-card border border-border/60 p-4">
-                    <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground mb-2">Navigation</p>
-                    <p className="text-sm text-foreground leading-relaxed">Move freely between questions using the progress rail while staying centered on the current question.</p>
-                  </div>
-                  <div className="rounded-2xl bg-card border border-border/60 p-4">
-                    <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground mb-2">Review</p>
-                    <p className="text-sm text-foreground leading-relaxed">Scores, answer explanations, and past attempts are available after every completed run.</p>
-                  </div>
-                </div>
-
-                <div className="rounded-3xl border border-border/70 bg-card/80 p-5 mb-8">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-accent mb-2">What this page includes</p>
-                      <p className="font-heading text-xl font-semibold text-foreground">A full test workspace, not just a launch button</p>
-                    </div>
-                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
-                      Dashboard resource preview
-                    </span>
-                  </div>
-                  <div className="mt-5 grid gap-3 md:grid-cols-3">
-                    <div className="rounded-2xl bg-muted/55 px-4 py-4">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">During the test</p>
-                      <p className="mt-2 text-sm leading-relaxed text-foreground">Live timer, progress rail, and question-to-question navigation in one view.</p>
-                    </div>
-                    <div className="rounded-2xl bg-muted/55 px-4 py-4">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">After submission</p>
-                      <p className="mt-2 text-sm leading-relaxed text-foreground">Saved attempts, best-score tracking, and a structured review loop.</p>
-                    </div>
-                    <div className="rounded-2xl bg-muted/55 px-4 py-4">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Why it matters</p>
-                      <p className="mt-2 text-sm leading-relaxed text-foreground">Each attempt becomes a reusable study resource instead of a one-time score screen.</p>
-                    </div>
-                  </div>
-                </div>
-
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Button variant="hero" size="xl" className="sm:min-w-[240px]" onClick={startTest} disabled={locked}>
                     <Play className="h-5 w-5 mr-2" />
                     Start Fresh Attempt
                   </Button>
-                  <div className="rounded-xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
-                    Use this screen to review previous scores before launching a new timed attempt.
-                    {!showDetailedFeedback && " Free preview attempts hide correct answers and full answer review."}
-                  </div>
+                  {!showDetailedFeedback && (
+                    <div className="rounded-xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
+                      Correct answers and full answer review unlock with premium access.
+                    </div>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -564,7 +553,7 @@ const PracticeTestView = () => {
           <div className="space-y-4">
             {questions.map((question, index) => {
               const userAnswer = answers[index];
-              const isCorrect = userAnswer === question.correctIndex;
+              const isCorrect = isCorrectAnswer(question, userAnswer);
               const reviewQuestionUnlocked = isPreviewTestQuestionUnlocked(test.id, index);
 
               return (
@@ -597,7 +586,7 @@ const PracticeTestView = () => {
                           <p className="text-sm text-muted-foreground">No answer submitted.</p>
                         )}
                         {showDetailedFeedback ? (
-                          <p className="text-sm text-green-600 mt-1">Correct answer: {question.options[question.correctIndex]?.text ?? "Unavailable"}</p>
+                          <p className="text-sm text-green-600 mt-1">Correct answer: {formatCorrectAnswerText(question) || "Unavailable"}</p>
                         ) : (
                           <p className="text-sm text-muted-foreground mt-1">Correct answer available with premium access.</p>
                         )}
@@ -686,7 +675,59 @@ const PracticeTestView = () => {
                 <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
                   <div>
                     <p className="text-xs font-semibold tracking-[0.24em] uppercase text-muted-foreground mb-2">Question {currentQ + 1} of {totalQuestions}</p>
-                    <h2 className="font-heading text-2xl font-semibold text-foreground leading-tight">{currentQuestion.question}</h2>
+                    {isMemoryTest && parsedMemoryQuestion ? (
+                      <div className="space-y-4">
+                        <div className="rounded-2xl border border-border/60 bg-card/75 p-4">
+                          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">Study material</p>
+                              <p className="text-sm text-muted-foreground">Use the toggle to blur or reveal the material whenever you want.</p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowMemoryStudyMaterial((current) => !current)}
+                              disabled={!questionUnlocked || locked}
+                            >
+                              {showMemoryStudyMaterial ? (
+                                <>
+                                  <EyeOff className="mr-2 h-4 w-4" />
+                                  Blur material
+                                </>
+                              ) : (
+                                <>
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  Reveal material
+                                </>
+                              )}
+                            </Button>
+                          </div>
+
+                          <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-background/80 p-4">
+                            <div className={showMemoryStudyMaterial ? "transition-all duration-200" : "select-none blur-md transition-all duration-200"}>
+                              <p className="whitespace-pre-line text-base leading-7 text-foreground">
+                                {parsedMemoryQuestion.studyMaterial}
+                              </p>
+                            </div>
+                            {!showMemoryStudyMaterial && (
+                              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-background/35">
+                                <div className="rounded-full border border-border/60 bg-background/90 px-4 py-2 text-sm font-medium text-foreground shadow-sm">
+                                  Study material hidden
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground mb-2">Question</p>
+                          <h2 className="font-heading text-2xl font-semibold text-foreground leading-tight">{parsedMemoryQuestion.prompt}</h2>
+                        </div>
+                      </div>
+                    ) : (
+                      <h2 className="font-heading text-2xl font-semibold text-foreground leading-tight">{currentQuestion.question}</h2>
+                    )}
                     {currentQuestion.questionImageUrl || currentQuestion.questionImagePath ? (
                       <img
                         src={currentQuestion.questionImageUrl || currentQuestion.questionImagePath || ""}

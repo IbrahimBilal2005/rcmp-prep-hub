@@ -39,6 +39,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import type { ModuleInfo, ModuleLesson, PracticeTest, QuizOption, QuizQuestion } from "@/data/courseData";
 import { clearAuthSession } from "@/lib/auth";
+import { getCorrectIndexes, getPrimaryCorrectIndex } from "@/lib/quiz";
 import { cn } from "@/lib/utils";
 import {
   createLesson,
@@ -127,19 +128,12 @@ const createNewQuestionDraft = (): QuizQuestion => ({
     { text: "Option D", imagePath: null, imageUrl: null },
   ],
   correctIndex: 0,
+  correctIndexes: [0],
   explanation: "Write the explanation learners should see after answering.",
 });
 
 const getOptionLabel = (optionIndex: number) =>
   optionIndex < 26 ? String.fromCharCode(65 + optionIndex) : `${optionIndex + 1}`;
-
-const clampCorrectIndex = (value: number, optionsLength: number) => {
-  if (!Number.isFinite(value)) {
-    return 0;
-  }
-
-  return Math.min(Math.max(0, value), Math.max(0, optionsLength - 1));
-};
 
 const createEmptyOption = (optionIndex: number): QuizOption => ({
   text: `Option ${getOptionLabel(optionIndex)}`,
@@ -158,17 +152,30 @@ const removeOptionFromQuestion = (question: QuizQuestion, optionIndex: number): 
   }
 
   const nextOptions = question.options.filter((_, index) => index !== optionIndex);
-  const nextCorrectIndex =
-    question.correctIndex > optionIndex
-      ? question.correctIndex - 1
-      : question.correctIndex === optionIndex
-        ? Math.max(0, optionIndex - 1)
-        : question.correctIndex;
+  const nextCorrectIndexes = getCorrectIndexes(question)
+    .filter((index) => index !== optionIndex)
+    .map((index) => (index > optionIndex ? index - 1 : index));
+  const fallbackCorrectIndexes = nextCorrectIndexes.length > 0 ? nextCorrectIndexes : [0];
 
   return {
     ...question,
     options: nextOptions,
-    correctIndex: Math.min(nextCorrectIndex, nextOptions.length - 1),
+    correctIndex: fallbackCorrectIndexes[0] ?? null,
+    correctIndexes: fallbackCorrectIndexes,
+  };
+};
+
+const toggleCorrectOption = (question: QuizQuestion, optionIndex: number): QuizQuestion => {
+  const selectedIndexes = getCorrectIndexes(question);
+  const nextCorrectIndexes = selectedIndexes.includes(optionIndex)
+    ? selectedIndexes.filter((index) => index !== optionIndex)
+    : [...selectedIndexes, optionIndex].sort((a, b) => a - b);
+  const safeCorrectIndexes = nextCorrectIndexes.length > 0 ? nextCorrectIndexes : [optionIndex];
+
+  return {
+    ...question,
+    correctIndex: safeCorrectIndexes[0] ?? null,
+    correctIndexes: safeCorrectIndexes,
   };
 };
 
@@ -183,6 +190,7 @@ interface QuestionEditorFieldsProps {
   question: QuizQuestion;
   onChange: (patch: Partial<QuizQuestion>) => void;
   onOptionChange: (optionIndex: number, patch: Partial<QuizOption>) => void;
+  onToggleCorrectOption: (optionIndex: number) => void;
   onAddOption: () => void;
   onRemoveOption: (optionIndex: number) => void;
   questionAssetControl?: QuestionAssetControl;
@@ -270,6 +278,7 @@ const QuestionEditorFields = ({
   question,
   onChange,
   onOptionChange,
+  onToggleCorrectOption,
   onAddOption,
   onRemoveOption,
   questionAssetControl,
@@ -277,6 +286,7 @@ const QuestionEditorFields = ({
   uploadHint,
 }: QuestionEditorFieldsProps) => {
   const uploadIdBase = useId();
+  const selectedCorrectIndexes = getCorrectIndexes(question);
 
   return (
   <div className="space-y-3">
@@ -321,16 +331,26 @@ const QuestionEditorFields = ({
             <div key={`question-option-${optionIndex}`} className="flex h-full flex-col rounded-xl border border-border/60 bg-card/70 p-3">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <label className="text-sm font-medium text-foreground">Option {getOptionLabel(optionIndex)}</label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onRemoveOption(optionIndex)}
-                  disabled={question.options.length <= 2}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Remove
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant={selectedCorrectIndexes.includes(optionIndex) ? "hero" : "outline"}
+                    size="sm"
+                    onClick={() => onToggleCorrectOption(optionIndex)}
+                  >
+                    {selectedCorrectIndexes.includes(optionIndex) ? "Correct" : "Mark correct"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onRemoveOption(optionIndex)}
+                    disabled={question.options.length <= 2}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Remove
+                  </Button>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -362,21 +382,17 @@ const QuestionEditorFields = ({
       </div>
     </div>
 
-    <div className="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)]">
+    <div className="grid gap-4 sm:grid-cols-[240px_minmax(0,1fr)]">
       <div className="space-y-2">
-        <label className="text-sm font-medium text-foreground">Correct option index</label>
-        <Input
-          type="number"
-          min={0}
-          max={question.options.length - 1}
-          value={question.correctIndex}
-          onChange={(event) =>
-            onChange({
-              correctIndex: clampCorrectIndex(Number(event.target.value), question.options.length),
-            })
-          }
-          className="bg-background/70"
-        />
+        <label className="text-sm font-medium text-foreground">Correct answers</label>
+        <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-3 text-sm text-muted-foreground">
+          {selectedCorrectIndexes.length === question.options.length
+            ? "All options are marked correct."
+            : selectedCorrectIndexes.map(getOptionLabel).join(", ")}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Mark one or more options as correct. Marking every option creates an all-correct question.
+        </p>
       </div>
       <div className="space-y-2">
         <label className="text-sm font-medium text-foreground">Explanation</label>
@@ -1639,6 +1655,7 @@ const AdminDashboard = () => {
                           question={newModuleQuestionDraft}
                           onChange={(patch) => setNewModuleQuestionDraft((current) => ({ ...current, ...patch }))}
                           onOptionChange={updateNewModuleQuestionOption}
+                          onToggleCorrectOption={(optionIndex) => setNewModuleQuestionDraft((current) => toggleCorrectOption(current, optionIndex))}
                           onAddOption={() => setNewModuleQuestionDraft((current) => addOptionToQuestion(current))}
                           onRemoveOption={(optionIndex) => setNewModuleQuestionDraft((current) => removeOptionFromQuestion(current, optionIndex))}
                           uploadHint="Create the question first if you want to upload local images."
@@ -1659,7 +1676,7 @@ const AdminDashboard = () => {
                         <div className="min-w-0">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent">Question {questionIndex + 1}</p>
                           <p className="mt-1 font-semibold text-foreground">{question.question}</p>
-                          <p className="mt-2 text-xs text-muted-foreground">Correct answer: {getOptionLabel(question.correctIndex)}</p>
+                          <p className="mt-2 text-xs text-muted-foreground">Correct answer(s): {getCorrectIndexes(question).map(getOptionLabel).join(", ")}</p>
                           <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted-foreground">{question.explanation}</p>
                         </div>
 
@@ -1682,6 +1699,7 @@ const AdminDashboard = () => {
                                 question={question}
                                 onChange={(patch) => updateModuleQuestion(questionIndex, patch)}
                                 onOptionChange={(optionIndex, patch) => updateModuleQuestionOption(questionIndex, optionIndex, patch)}
+                                onToggleCorrectOption={(optionIndex) => updateModuleQuestion(questionIndex, toggleCorrectOption(question, optionIndex))}
                                 onAddOption={() => addModuleQuestionOption(questionIndex)}
                                 onRemoveOption={(optionIndex) => removeModuleQuestionOption(questionIndex, optionIndex)}
                                 questionAssetControl={{
@@ -1912,6 +1930,7 @@ const AdminDashboard = () => {
                           question={newTestQuestionDraft}
                           onChange={(patch) => setNewTestQuestionDraft((current) => ({ ...current, ...patch }))}
                           onOptionChange={updateNewTestQuestionOption}
+                          onToggleCorrectOption={(optionIndex) => setNewTestQuestionDraft((current) => toggleCorrectOption(current, optionIndex))}
                           onAddOption={() => setNewTestQuestionDraft((current) => addOptionToQuestion(current))}
                           onRemoveOption={(optionIndex) => setNewTestQuestionDraft((current) => removeOptionFromQuestion(current, optionIndex))}
                           uploadHint="Create the question first if you want to upload local images."
@@ -1932,7 +1951,7 @@ const AdminDashboard = () => {
                         <div className="min-w-0">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent">Question {questionIndex + 1}</p>
                           <p className="mt-1 font-semibold text-foreground">{question.question}</p>
-                          <p className="mt-2 text-xs text-muted-foreground">Correct answer: {getOptionLabel(question.correctIndex)}</p>
+                          <p className="mt-2 text-xs text-muted-foreground">Correct answer(s): {getCorrectIndexes(question).map(getOptionLabel).join(", ")}</p>
                           <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted-foreground">{question.explanation}</p>
                         </div>
 
@@ -1955,6 +1974,7 @@ const AdminDashboard = () => {
                                 question={question}
                                 onChange={(patch) => updateTestQuestion(questionIndex, patch)}
                                 onOptionChange={(optionIndex, patch) => updateTestQuestionOption(questionIndex, optionIndex, patch)}
+                                onToggleCorrectOption={(optionIndex) => updateTestQuestion(questionIndex, toggleCorrectOption(question, optionIndex))}
                                 onAddOption={() => addTestQuestionOption(questionIndex)}
                                 onRemoveOption={(optionIndex) => removeTestQuestionOption(questionIndex, optionIndex)}
                                 questionAssetControl={{

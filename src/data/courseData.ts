@@ -12,7 +12,8 @@ export interface QuizQuestion {
   questionImagePath: string | null;
   questionImageUrl?: string | null;
   options: QuizOption[];
-  correctIndex: number;
+  correctIndex: number | null;
+  correctIndexes: number[];
   explanation: string;
 }
 

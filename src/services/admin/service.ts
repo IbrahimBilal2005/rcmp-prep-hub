@@ -1,4 +1,5 @@
 import type { ModuleInfo, ModuleLesson, PracticeTest, QuizQuestion } from "@/data/courseData";
+import { getCorrectIndexes, getPrimaryCorrectIndex } from "@/lib/quiz";
 import { supabase } from "@/services/supabase/client";
 
 export type AdminUserStatus = "active" | "invited" | "suspended";
@@ -270,12 +271,14 @@ export const deleteLesson = async (lessonId: number) => {
 export const createModuleQuestion = async (moduleId: number, draft: QuizQuestion) => {
   const client = requireSupabase();
   const sortOrder = await getNextSortOrder("module_quiz_questions", "module_id", moduleId);
+  const correctIndexes = getCorrectIndexes(draft);
   const { error } = await client.from("module_quiz_questions").insert({
     module_id: moduleId,
     question: draft.question.trim() || "Add a new question prompt.",
     question_image_path: draft.questionImagePath?.trim() || null,
     options: serializeQuestionOptions(draft.options),
-    correct_index: draft.correctIndex,
+    correct_index: getPrimaryCorrectIndex(draft),
+    correct_indexes: correctIndexes,
     explanation: draft.explanation.trim() || "Add the explanation for this question.",
     sort_order: sortOrder,
   });
@@ -287,7 +290,7 @@ export const createModuleQuestion = async (moduleId: number, draft: QuizQuestion
 
 export const updateModuleQuestion = async (questionId: number, patch: Partial<QuizQuestion>) => {
   const client = requireSupabase();
-  const updates: Record<string, string | number | object[] | null> = {};
+  const updates: Record<string, string | number | number[] | object[] | null> = {};
 
   if (typeof patch.question === "string") {
     updates.question = patch.question.trim();
@@ -301,8 +304,14 @@ export const updateModuleQuestion = async (questionId: number, patch: Partial<Qu
     updates.question_image_path = patch.questionImagePath?.trim() || null;
   }
 
-  if (typeof patch.correctIndex === "number") {
-    updates.correct_index = patch.correctIndex;
+  if ("correctIndex" in patch || Array.isArray(patch.correctIndexes)) {
+    const nextQuestion = {
+      options: Array.isArray(patch.options) ? patch.options : [],
+      correctIndex: patch.correctIndex ?? null,
+      correctIndexes: patch.correctIndexes ?? [],
+    } as QuizQuestion;
+    updates.correct_index = getPrimaryCorrectIndex(nextQuestion);
+    updates.correct_indexes = getCorrectIndexes(nextQuestion);
   }
 
   if (typeof patch.explanation === "string") {
@@ -385,12 +394,14 @@ export const deletePracticeTest = async (testId: number) => {
 export const createPracticeTestQuestion = async (testId: number, draft: QuizQuestion) => {
   const client = requireSupabase();
   const sortOrder = await getNextSortOrder("practice_test_questions", "practice_test_id", testId);
+  const correctIndexes = getCorrectIndexes(draft);
   const { error } = await client.from("practice_test_questions").insert({
     practice_test_id: testId,
     question: draft.question.trim() || "Add a new question prompt.",
     question_image_path: draft.questionImagePath?.trim() || null,
     options: serializeQuestionOptions(draft.options),
-    correct_index: draft.correctIndex,
+    correct_index: getPrimaryCorrectIndex(draft),
+    correct_indexes: correctIndexes,
     explanation: draft.explanation.trim() || "Add the explanation for this question.",
     sort_order: sortOrder,
   });
@@ -402,7 +413,7 @@ export const createPracticeTestQuestion = async (testId: number, draft: QuizQues
 
 export const updatePracticeTestQuestion = async (questionId: number, patch: Partial<QuizQuestion>) => {
   const client = requireSupabase();
-  const updates: Record<string, string | number | object[] | null> = {};
+  const updates: Record<string, string | number | number[] | object[] | null> = {};
 
   if (typeof patch.question === "string") {
     updates.question = patch.question.trim();
@@ -416,8 +427,14 @@ export const updatePracticeTestQuestion = async (questionId: number, patch: Part
     updates.question_image_path = patch.questionImagePath?.trim() || null;
   }
 
-  if (typeof patch.correctIndex === "number") {
-    updates.correct_index = patch.correctIndex;
+  if ("correctIndex" in patch || Array.isArray(patch.correctIndexes)) {
+    const nextQuestion = {
+      options: Array.isArray(patch.options) ? patch.options : [],
+      correctIndex: patch.correctIndex ?? null,
+      correctIndexes: patch.correctIndexes ?? [],
+    } as QuizQuestion;
+    updates.correct_index = getPrimaryCorrectIndex(nextQuestion);
+    updates.correct_indexes = getCorrectIndexes(nextQuestion);
   }
 
   if (typeof patch.explanation === "string") {

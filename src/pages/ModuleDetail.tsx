@@ -24,6 +24,7 @@ import {
   isPreviewLessonUnlocked,
   isPreviewModuleQuizQuestionUnlocked,
 } from "@/lib/access";
+import { getCorrectIndexes, isCorrectAnswer } from "@/lib/quiz";
 import { getModuleProgress, isModuleFullyCompleted, upsertModuleProgress } from "@/lib/moduleProgressStorage";
 import { getEmptyCourseContent } from "@/services/content/service";
 import { useCourseContent } from "@/services/content/useCourseContent";
@@ -179,7 +180,7 @@ const ModuleDetail = () => {
     setShowExplanation(true);
     setAnsweredCount((prev) => prev + 1);
 
-    if (idx === currentQuestion.correctIndex) {
+    if (isCorrectAnswer(currentQuestion, idx)) {
       setScore((prev) => prev + 1);
     }
   };
@@ -253,6 +254,8 @@ const ModuleDetail = () => {
       updatedAt: new Date().toISOString(),
     }));
   };
+
+  const correctIndexes = currentQuestion ? getCorrectIndexes(currentQuestion) : [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -434,9 +437,9 @@ const ModuleDetail = () => {
                     {currentQuestion.options.map((opt, idx) => {
                       let optionStyle = "glass-card hover:border-accent/30";
                       if (showExplanation && showDetailedFeedback) {
-                        if (idx === currentQuestion.correctIndex) {
+                        if (correctIndexes.includes(idx)) {
                           optionStyle = "border-2 border-green-500 bg-green-500/10";
-                        } else if (idx === selectedAnswer && idx !== currentQuestion.correctIndex) {
+                        } else if (idx === selectedAnswer && !correctIndexes.includes(idx)) {
                           optionStyle = "border-2 border-destructive bg-destructive/10";
                         } else {
                           optionStyle = "border border-border opacity-50";
@@ -465,10 +468,10 @@ const ModuleDetail = () => {
                               />
                             ) : null}
                           </div>
-                          {showExplanation && showDetailedFeedback && idx === currentQuestion.correctIndex && (
+                          {showExplanation && showDetailedFeedback && correctIndexes.includes(idx) && (
                             <CheckCircle className="h-5 w-5 text-green-500 ml-auto flex-shrink-0" />
                           )}
-                          {showExplanation && showDetailedFeedback && idx === selectedAnswer && idx !== currentQuestion.correctIndex && (
+                          {showExplanation && showDetailedFeedback && idx === selectedAnswer && !correctIndexes.includes(idx) && (
                             <XCircle className="h-5 w-5 text-destructive ml-auto flex-shrink-0" />
                           )}
                         </button>

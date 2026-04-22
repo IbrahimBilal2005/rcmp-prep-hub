@@ -46,24 +46,33 @@ const Signup = () => {
     setError(checkoutParam === "cancelled" ? "Checkout was cancelled. You can choose a plan again whenever you're ready." : "");
   }, [checkoutParam, modeParam, stepParam, storedSession]);
 
-  const handleAccountSubmit = async (event: FormEvent) => {
+  const handleAccountSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
     setIsSubmitting(true);
 
+    const formData = new FormData(event.currentTarget);
+    const submittedName = String(formData.get("fullName") ?? name).trim();
+    const submittedEmail = String(formData.get("email") ?? email).trim();
+    const submittedPassword = String(formData.get("password") ?? password);
+
+    setName(submittedName);
+    setEmail(submittedEmail);
+    setPassword(submittedPassword);
+
     try {
-      if (!email.trim() || !password.trim() || (mode === "signup" && !name.trim())) {
+      if (!submittedEmail || !submittedPassword || (mode === "signup" && !submittedName)) {
         throw new Error(mode === "signup" ? "Enter your name, email, and password to continue." : "Enter your email and password to continue.");
       }
 
       if (mode === "login") {
-        const session = await signInWithEmail({ email, password });
+        const session = await signInWithEmail({ email: submittedEmail, password: submittedPassword });
         saveAuthSession(session);
         navigate(session.role === "admin" ? "/admin" : "/dashboard");
         return;
       }
 
-      const profile = await signUpWithEmail({ name, email, password });
+      const profile = await signUpWithEmail({ name: submittedName, email: submittedEmail, password: submittedPassword });
       saveAuthSession(profile);
       setPendingProfile(profile);
       setStep("plan");
@@ -195,7 +204,14 @@ const Signup = () => {
                       <span className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
                         <UserRound className="h-4 w-4 text-accent" /> Full name
                       </span>
-                    <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Bilal Khan" className="bg-background/70" />
+                    <Input
+                      name="fullName"
+                      autoComplete="name"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      placeholder="Bilal Khan"
+                      className="bg-background/70"
+                    />
                   </label>
                   )}
 
@@ -203,14 +219,30 @@ const Signup = () => {
                     <span className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
                       <Mail className="h-4 w-4 text-accent" /> Email
                     </span>
-                    <Input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" type="email" className="bg-background/70" />
+                    <Input
+                      name="email"
+                      autoComplete="email"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      placeholder="you@example.com"
+                      type="email"
+                      className="bg-background/70"
+                    />
                   </label>
 
                   <label className="block">
                     <span className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
                       <LockKeyhole className="h-4 w-4 text-accent" /> Password
                     </span>
-                    <Input value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" type="password" className="bg-background/70" />
+                    <Input
+                      name="password"
+                      autoComplete={mode === "login" ? "current-password" : "new-password"}
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      placeholder="Enter your password"
+                      type="password"
+                      className="bg-background/70"
+                    />
                   </label>
                 </div>
 
