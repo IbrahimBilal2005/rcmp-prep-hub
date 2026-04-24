@@ -134,15 +134,18 @@ export const hydratePersistedProgress = async (userIdOverride?: string) => {
   ]);
 
   if (moduleProgressError || lessonCompletionError || practiceAttemptError) {
-    console.error("Failed to hydrate progress from Supabase", {
+    console.error("Progress hydration returned partial errors", {
       moduleProgressError,
       lessonCompletionError,
       practiceAttemptError,
     });
-    return;
   }
 
-  const completionMap = (lessonCompletionRows ?? []).reduce<Record<number, number[]>>((acc, row) => {
+  const safeModuleProgressRows = moduleProgressError ? [] : (moduleProgressRows ?? []);
+  const safeLessonCompletionRows = lessonCompletionError ? [] : (lessonCompletionRows ?? []);
+  const safePracticeAttemptRows = practiceAttemptError ? [] : (practiceAttemptRows ?? []);
+
+  const completionMap = safeLessonCompletionRows.reduce<Record<number, number[]>>((acc, row) => {
     const completion = row as unknown as LessonCompletionRow;
     const moduleId = completion.lessons?.module_id;
     const sortOrder = completion.lessons?.sort_order;
@@ -155,7 +158,7 @@ export const hydratePersistedProgress = async (userIdOverride?: string) => {
     return acc;
   }, {});
 
-  const progressMap = (moduleProgressRows ?? []).reduce<Record<number, ModuleProgressRecord>>((acc, row) => {
+  const progressMap = safeModuleProgressRows.reduce<Record<number, ModuleProgressRecord>>((acc, row) => {
     const progress = row as unknown as ModuleProgressRow;
 
     acc[progress.module_id] = {
@@ -194,7 +197,7 @@ export const hydratePersistedProgress = async (userIdOverride?: string) => {
 
   replaceAllModuleProgress(progressMap);
 
-  const attempts = (practiceAttemptRows ?? []).map((row) => {
+  const attempts = safePracticeAttemptRows.map((row) => {
     const attempt = row as unknown as PracticeAttemptRow;
     return {
       id: String(attempt.id),

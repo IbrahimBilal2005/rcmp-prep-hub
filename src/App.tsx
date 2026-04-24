@@ -49,6 +49,7 @@ const RouteFallback = () => <div className="min-h-screen bg-background" />;
 
 const AuthBootstrap = ({ children }: { children: React.ReactNode }) => {
   const [ready, setReady] = useState(false);
+  const [, setAuthVersion] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -63,7 +64,13 @@ const AuthBootstrap = ({ children }: { children: React.ReactNode }) => {
 
       setReady(true);
 
-      unsubscribe = subscribeToAuthChanges();
+      unsubscribe = subscribeToAuthChanges(() => {
+        if (!active) {
+          return;
+        }
+
+        setAuthVersion((current) => current + 1);
+      });
     })();
 
     return () => {
