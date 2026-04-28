@@ -3,6 +3,7 @@ import { MotionConfig } from "framer-motion";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { getAuthSession, initializeAuthSession, isAuthenticated, subscribeToAuthChanges } from "@/lib/auth";
 import { AppProviders } from "@/providers/AppProviders";
+import { AUTH_SESSION_CHANGED_EVENT } from "@/services/auth/session-storage";
 
 const Index = lazy(() => import("./pages/Index.tsx"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard.tsx"));
@@ -54,6 +55,13 @@ const AuthBootstrap = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     let active = true;
     let unsubscribe = () => undefined;
+    const handleStoredSessionChange = () => {
+      if (!active) {
+        return;
+      }
+
+      setAuthVersion((current) => current + 1);
+    };
 
     void (async () => {
       await initializeAuthSession();
@@ -63,6 +71,8 @@ const AuthBootstrap = ({ children }: { children: React.ReactNode }) => {
       }
 
       setReady(true);
+
+      window.addEventListener(AUTH_SESSION_CHANGED_EVENT, handleStoredSessionChange);
 
       unsubscribe = subscribeToAuthChanges(() => {
         if (!active) {
@@ -75,6 +85,7 @@ const AuthBootstrap = ({ children }: { children: React.ReactNode }) => {
 
     return () => {
       active = false;
+      window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, handleStoredSessionChange);
       unsubscribe();
     };
   }, []);

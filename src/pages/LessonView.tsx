@@ -21,39 +21,8 @@ const LessonView = () => {
   const [completedLessons, setCompletedLessons] = useState<number[]>([]);
   const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string | null>(null);
   const [resolvedPosterUrl, setResolvedPosterUrl] = useState<string | null>(null);
-
-  if (isLoading && modules.length === 0) {
-    return (
-      <div className="min-h-screen overflow-x-hidden bg-background">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-5xl px-4 py-10">
-          <div className="text-center">
-            <h1 className="text-2xl font-heading font-bold text-foreground mb-4">Loading lesson</h1>
-            <p className="text-muted-foreground">Fetching lesson content from Supabase.</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!mod) {
-    return (
-      <div className="min-h-screen overflow-x-hidden bg-background">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-5xl px-4 py-10">
-          <div className="text-center">
-            <h1 className="text-2xl font-heading font-bold text-foreground mb-4">Lesson not found</h1>
-            <Link to="/dashboard">
-              <Button>Back to Dashboard</Button>
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const isValidLessonIndex = Number.isInteger(lessonNumber) && lessonNumber >= 0 && lessonNumber < mod.lessons.length;
-  const lesson = isValidLessonIndex ? mod.lessons[lessonNumber] : null;
+  const isValidLessonIndex = Boolean(mod) && Number.isInteger(lessonNumber) && lessonNumber >= 0 && lessonNumber < mod.lessons.length;
+  const lesson = mod && isValidLessonIndex ? mod.lessons[lessonNumber] : null;
   const moduleUnlocked = canAccessModule(moduleId);
   const lessonUnlocked = lesson ? moduleUnlocked && isPreviewLessonUnlocked(moduleId, lessonNumber) : false;
 
@@ -104,6 +73,36 @@ const LessonView = () => {
       active = false;
     };
   }, [lesson]);
+
+  if (isLoading && modules.length === 0) {
+    return (
+      <div className="min-h-screen overflow-x-hidden bg-background">
+        <DashboardHeader />
+        <div className="container mx-auto max-w-5xl px-4 py-10">
+          <div className="text-center">
+            <h1 className="text-2xl font-heading font-bold text-foreground mb-4">Loading lesson</h1>
+            <p className="text-muted-foreground">Fetching lesson content from Supabase.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!mod) {
+    return (
+      <div className="min-h-screen overflow-x-hidden bg-background">
+        <DashboardHeader />
+        <div className="container mx-auto max-w-5xl px-4 py-10">
+          <div className="text-center">
+            <h1 className="text-2xl font-heading font-bold text-foreground mb-4">Lesson not found</h1>
+            <Link to="/dashboard">
+              <Button>Back to Dashboard</Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!lesson || !lessonUnlocked) {
     return <Navigate to={`/module/${moduleId}`} replace />;

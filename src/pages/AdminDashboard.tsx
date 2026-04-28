@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -64,7 +64,7 @@ import {
   updatePracticeTestQuestion as updatePracticeTestQuestionRecord,
 } from "@/services/admin/service";
 import { getEmptyCourseContent } from "@/services/content/service";
-import { useCourseContent } from "@/services/content/useCourseContent";
+import { COURSE_CONTENT_QUERY_KEY, useCourseContent } from "@/services/content/useCourseContent";
 import { removeLessonAsset, uploadLessonAsset, validateLessonAssetFile } from "@/services/storage/lesson-assets";
 import { removeQuestionAsset, uploadQuestionAsset } from "@/services/storage/question-assets";
 
@@ -413,7 +413,8 @@ const AdminDashboard = () => {
   const { data: adminUsers = EMPTY_ADMIN_USERS } = useQuery({
     queryKey: ["admin-users"],
     queryFn: fetchAdminUsers,
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
   });
   const resolvedCourseContent = courseContent ?? EMPTY_COURSE_CONTENT;
   const modules = resolvedCourseContent.modules;
@@ -439,10 +440,16 @@ const AdminDashboard = () => {
   const [uploadingAssetKey, setUploadingAssetKey] = useState<string | null>(null);
   const [uploadedAssetLabels, setUploadedAssetLabels] = useState<Record<string, string>>({});
   const [assetStatusText, setAssetStatusText] = useState<Record<string, string>>({});
+  const courseDraftsHydratedRef = useRef(false);
+  const shouldSyncCourseDraftsRef = useRef(false);
 
-  const refreshCourseContent = async () => {
-    await queryClient.invalidateQueries({ queryKey: ["course-content"] });
-    await queryClient.refetchQueries({ queryKey: ["course-content"] });
+  const refreshCourseContent = async ({ syncDrafts = true }: { syncDrafts?: boolean } = {}) => {
+    if (syncDrafts) {
+      shouldSyncCourseDraftsRef.current = true;
+    }
+
+    await queryClient.invalidateQueries({ queryKey: COURSE_CONTENT_QUERY_KEY });
+    await queryClient.refetchQueries({ queryKey: COURSE_CONTENT_QUERY_KEY });
   };
 
   const refreshUsers = async () => {
@@ -451,7 +458,7 @@ const AdminDashboard = () => {
   };
 
   const syncCourseContentInBackground = () => {
-    void queryClient.invalidateQueries({ queryKey: ["course-content"] });
+    void queryClient.invalidateQueries({ queryKey: COURSE_CONTENT_QUERY_KEY });
   };
 
   const showMutationError = (title: string, error: unknown) => {
@@ -493,13 +500,14 @@ const AdminDashboard = () => {
 
     try {
       validateLessonAssetFile(kind, file);
-      await uploadLessonAsset({
+      const nextPath = await uploadLessonAsset({
         moduleId: selectedModule.id,
         lessonId: lesson.id,
         file,
         kind,
         previousPath: kind === "video" ? lesson.videoUrl : lesson.posterUrl,
       });
+      updateLesson(lessonIndex, kind === "video" ? { videoUrl: nextPath } : { posterUrl: nextPath });
       setUploadedAssetLabels((current) => ({
         ...current,
         [assetKey]: file.name,
@@ -509,7 +517,7 @@ const AdminDashboard = () => {
         [assetKey]: "Upload complete",
       }));
       setUploadingAssetKey(null);
-      void refreshCourseContent();
+      syncCourseContentInBackground();
       toast({
         title: kind === "video" ? "Video uploaded" : "Poster uploaded",
         description: `${file.name} was uploaded to Supabase Storage and linked to this lecture.`,
@@ -552,6 +560,7 @@ const AdminDashboard = () => {
         kind,
         currentPath,
       });
+      updateLesson(lessonIndex, kind === "video" ? { videoUrl: null } : { posterUrl: null });
       setUploadedAssetLabels((current) => {
         const next = { ...current };
         delete next[assetKey];
@@ -562,7 +571,7 @@ const AdminDashboard = () => {
         [assetKey]: "File removed",
       }));
       setUploadingAssetKey(null);
-      void refreshCourseContent();
+      syncCourseContentInBackground();
       toast({
         title: kind === "video" ? "Video removed" : "Poster removed",
         description: "The linked file was removed from Supabase Storage and the lesson record.",
@@ -579,10 +588,20 @@ const AdminDashboard = () => {
   };
 
   useEffect(() => {
+    if (modules.length === 0 || practiceTests.length === 0) {
+      return;
+    }
+
+    if (courseDraftsHydratedRef.current && !shouldSyncCourseDraftsRef.current) {
+      return;
+    }
+
     setModuleDrafts(createModuleDrafts(modules));
     setTestDrafts(createTestDrafts(practiceTests));
     setSelectedModuleId((current) => modules.find((module) => module.id === current)?.id ?? modules[0]?.id ?? 1);
     setSelectedTestId((current) => practiceTests.find((test) => test.id === current)?.id ?? practiceTests[0]?.id ?? "numerical");
+    courseDraftsHydratedRef.current = true;
+    shouldSyncCourseDraftsRef.current = false;
   }, [modules, practiceTests]);
 
   useEffect(() => {
@@ -800,7 +819,7 @@ const AdminDashboard = () => {
         title: selectedModule.title,
         description: selectedModule.description,
       });
-      await refreshCourseContent();
+      syncCourseContentInBackground();
       toast({ title: "Module updated", description: "Module details are now live in Supabase." });
     } catch (error) {
       showMutationError("Unable to update module", error);
@@ -829,7 +848,7 @@ const AdminDashboard = () => {
 
     try {
       await updateLessonRecord(lesson.id, lesson);
-      await refreshCourseContent();
+      syncCourseContentInBackground();
       toast({ title: "Lecture updated", description: "Lecture changes were saved to Supabase." });
     } catch (error) {
       showMutationError("Unable to update lecture", error);
@@ -858,7 +877,7 @@ const AdminDashboard = () => {
 
     try {
       await updateModuleQuestionRecord(question.id, question);
-      await refreshCourseContent();
+      syncCourseContentInBackground();
       toast({ title: "Question updated", description: "Module quiz changes were saved to Supabase." });
     } catch (error) {
       showMutationError("Unable to update question", error);
@@ -1037,7 +1056,7 @@ const AdminDashboard = () => {
         description: selectedTest.description,
         time: selectedTest.time,
       });
-      await refreshCourseContent();
+      syncCourseContentInBackground();
       toast({ title: "Practice test updated", description: "Test settings were saved to Supabase." });
     } catch (error) {
       showMutationError("Unable to update test", error);
@@ -1084,7 +1103,7 @@ const AdminDashboard = () => {
 
     try {
       await updatePracticeTestQuestionRecord(question.id, question);
-      await refreshCourseContent();
+      syncCourseContentInBackground();
       toast({ title: "Question updated", description: "Timed-test question changes were saved." });
     } catch (error) {
       showMutationError("Unable to update question", error);

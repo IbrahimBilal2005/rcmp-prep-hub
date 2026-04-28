@@ -1,4 +1,5 @@
 import { supabase } from "@/services/supabase/client";
+import { optimizeImageForUpload, withUploadTimeout } from "@/services/storage/image-upload";
 
 export type LessonAssetKind = "video" | "poster";
 
@@ -84,15 +85,19 @@ export const uploadLessonAsset = async ({
   }
 
   validateLessonAssetFile(kind, file);
+  const uploadFile = kind === "poster" ? await optimizeImageForUpload(file) : file;
+  validateLessonAssetFile(kind, uploadFile);
 
   const bucket = getBucketName(kind);
-  const fileName = sanitizeFileName(file.name || `${kind}-${Date.now()}`);
+  const fileName = sanitizeFileName(uploadFile.name || `${kind}-${Date.now()}`);
   const storagePath = `module-${moduleId}/lesson-${lessonId}/${Date.now()}-${fileName}`;
 
-  const { error: uploadError } = await supabase.storage.from(bucket).upload(storagePath, file, {
+  const uploadOperation = supabase.storage.from(bucket).upload(storagePath, uploadFile, {
     upsert: true,
-    contentType: file.type || undefined,
+    contentType: uploadFile.type || undefined,
   });
+  const { error: uploadError } =
+    kind === "poster" ? await withUploadTimeout(uploadOperation, "Poster upload") : await uploadOperation;
 
   if (uploadError) {
     throw new Error(uploadError.message);

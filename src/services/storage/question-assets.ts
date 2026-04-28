@@ -1,8 +1,11 @@
 import { supabase } from "@/services/supabase/client";
+import { optimizeImageForUpload, withUploadTimeout } from "@/services/storage/image-upload";
 
 const QUESTION_IMAGE_BUCKET = "question-images";
 const MAX_QUESTION_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_QUESTION_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
+const SIGNED_URL_CACHE_BUFFER_MS = 60_000;
 
 const sanitizeFileName = (name: string) =>
   name
@@ -12,6 +15,8 @@ const sanitizeFileName = (name: string) =>
     .replace(/^-+|-+$/g, "");
 
 const isAbsoluteUrl = (value: string) => /^https?:\/\//i.test(value);
+
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 
 export const validateQuestionImageFile = (file: File) => {
   if (!ALLOWED_QUESTION_IMAGE_TYPES.has(file.type)) {
@@ -36,12 +41,22 @@ export const resolveQuestionAssetUrl = async (path: string | null) => {
     return null;
   }
 
-  const { data, error } = await supabase.storage.from(QUESTION_IMAGE_BUCKET).createSignedUrl(path, 60 * 60);
+  const cached = signedUrlCache.get(path);
+  if (cached && cached.expiresAt - SIGNED_URL_CACHE_BUFFER_MS > Date.now()) {
+    return cached.url;
+  }
+
+  const { data, error } = await supabase.storage.from(QUESTION_IMAGE_BUCKET).createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
 
   if (error) {
     console.error("Unable to resolve question image URL", error);
     return null;
   }
+
+  signedUrlCache.set(path, {
+    url: data.signedUrl,
+    expiresAt: Date.now() + SIGNED_URL_TTL_SECONDS * 1000,
+  });
 
   return data.signedUrl;
 };
@@ -66,20 +81,23 @@ export const uploadQuestionAsset = async ({
   }
 
   validateQuestionImageFile(file);
+  const uploadFile = await optimizeImageForUpload(file);
+  validateQuestionImageFile(uploadFile);
 
-  const fileName = sanitizeFileName(file.name || `question-image-${Date.now()}`);
+  const fileName = sanitizeFileName(uploadFile.name || `question-image-${Date.now()}`);
   const storagePath = `${ownerType}-${ownerId}/question-${questionId}/${slot}/${Date.now()}-${fileName}`;
 
-  const { error: uploadError } = await supabase.storage.from(QUESTION_IMAGE_BUCKET).upload(storagePath, file, {
+  const { error: uploadError } = await withUploadTimeout(supabase.storage.from(QUESTION_IMAGE_BUCKET).upload(storagePath, uploadFile, {
     upsert: true,
-    contentType: file.type || undefined,
-  });
+    contentType: uploadFile.type || undefined,
+  }), "Question image upload");
 
   if (uploadError) {
     throw new Error(uploadError.message);
   }
 
   if (previousPath && !isAbsoluteUrl(previousPath) && previousPath !== storagePath) {
+    signedUrlCache.delete(previousPath);
     const { error: removeError } = await supabase.storage.from(QUESTION_IMAGE_BUCKET).remove([previousPath]);
 
     if (removeError) {
@@ -87,6 +105,7 @@ export const uploadQuestionAsset = async ({
     }
   }
 
+  signedUrlCache.delete(storagePath);
   return storagePath;
 };
 
@@ -99,6 +118,7 @@ export const removeQuestionAsset = async (currentPath: string | null) => {
     return;
   }
 
+  signedUrlCache.delete(currentPath);
   const { error } = await supabase.storage.from(QUESTION_IMAGE_BUCKET).remove([currentPath]);
 
   if (error) {

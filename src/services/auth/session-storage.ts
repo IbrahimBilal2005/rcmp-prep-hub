@@ -1,8 +1,17 @@
 import type { AuthSession } from "@/services/auth/types";
 
 const STORAGE_KEY = "aptitudeforge.auth-session";
+export const AUTH_SESSION_CHANGED_EVENT = "aptitudeforge:auth-session-changed";
 
 const canUseStorage = () => typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+
+const notifyAuthSessionChanged = () => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(new Event(AUTH_SESSION_CHANGED_EVENT));
+};
 
 export const getStoredAuthSession = (): AuthSession | null => {
   if (!canUseStorage()) {
@@ -28,6 +37,7 @@ export const saveStoredAuthSession = (session: AuthSession) => {
   }
 
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+  notifyAuthSessionChanged();
 };
 
 export const clearStoredAuthSession = () => {
@@ -36,4 +46,5 @@ export const clearStoredAuthSession = () => {
   }
 
   window.localStorage.removeItem(STORAGE_KEY);
+  notifyAuthSessionChanged();
 };
