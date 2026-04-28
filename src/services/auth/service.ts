@@ -138,6 +138,30 @@ const buildSessionFromSupabaseUser = async (
   );
 };
 
+const getActiveSupabaseUser = async () => {
+  if (!supabase) {
+    return null;
+  }
+
+  const { data, error } = await supabase.auth.getSession();
+
+  if (!error && data.session?.user) {
+    return data.session.user;
+  }
+
+  const { data: refreshedData, error: refreshError } = await supabase.auth.refreshSession();
+
+  if (!refreshError && refreshedData.session?.user) {
+    return refreshedData.session.user;
+  }
+
+  if (error || refreshError) {
+    console.error("Unable to restore Supabase auth session", error || refreshError);
+  }
+
+  return null;
+};
+
 export const getAuthSession = () => getStoredAuthSession();
 
 export const saveAuthSession = (session: AuthSession) => {
@@ -165,11 +189,9 @@ export const initializeAuthSession = async () => {
   }
 
   const stored = getAuthSession();
-  const { data, error } = await supabase.auth.getSession();
+  const user = await getActiveSupabaseUser();
 
-  const user = data.session?.user;
-
-  if (error || !user) {
+  if (!user) {
     clearStoredAuthSession();
     return null;
   }
@@ -192,9 +214,14 @@ export const subscribeToAuthChanges = (onResolved?: (session: AuthSession | null
     return () => undefined;
   }
 
-  const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+  const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
     if (!session?.user) {
-      clearStoredAuthSession();
+      if (event === "SIGNED_OUT" || event === "USER_DELETED") {
+        clearStoredAuthSession();
+        clearModuleProgress();
+        clearPracticeAttempts();
+      }
+
       onResolved?.(null);
       return;
     }
