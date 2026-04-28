@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
@@ -433,6 +433,11 @@ const AdminDashboard = () => {
   const [createModuleQuestionOpen, setCreateModuleQuestionOpen] = useState(false);
   const [createTestOpen, setCreateTestOpen] = useState(false);
   const [createTestQuestionOpen, setCreateTestQuestionOpen] = useState(false);
+  const [editModuleOpen, setEditModuleOpen] = useState(false);
+  const [editTestOpen, setEditTestOpen] = useState(false);
+  const [editLessonId, setEditLessonId] = useState<number | null>(null);
+  const [editModuleQuestionId, setEditModuleQuestionId] = useState<number | null>(null);
+  const [editTestQuestionId, setEditTestQuestionId] = useState<number | null>(null);
   const [newModuleDraft, setNewModuleDraft] = useState({ title: "", description: "" });
   const [newLessonDraft, setNewLessonDraft] = useState<ModuleLesson>(() => createNewLessonDraft());
   const [newModuleQuestionDraft, setNewModuleQuestionDraft] = useState<QuizQuestion>(() => createNewQuestionDraft());
@@ -504,6 +509,9 @@ const AdminDashboard = () => {
 
   const getLatestModuleQuestion = (questionId: number) =>
     moduleDraftsRef.current.flatMap((module) => module.quiz).find((question) => question.id === questionId) ?? null;
+
+  const getLatestLesson = (lessonId: number) =>
+    moduleDraftsRef.current.flatMap((module) => module.lessons).find((lesson) => lesson.id === lessonId) ?? null;
 
   const getLatestTestQuestion = (questionId: number) =>
     testDraftsRef.current.flatMap((test) => test.testQuestions).find((question) => question.id === questionId) ?? null;
@@ -907,8 +915,10 @@ const AdminDashboard = () => {
       });
       syncCourseContentInBackground();
       toast({ title: "Module updated", description: "Module details are now live in Supabase." });
+      return true;
     } catch (error) {
       showMutationError("Unable to update module", error);
+      return false;
     }
   };
 
@@ -929,15 +939,18 @@ const AdminDashboard = () => {
 
     if (!lesson?.id) {
       showMutationError("Unable to update lecture", new Error("This lecture is missing its database id."));
-      return;
+      return false;
     }
 
     try {
-      await updateLessonRecord(lesson.id, lesson);
+      const latestLesson = getLatestLesson(lesson.id) ?? lesson;
+      await updateLessonRecord(lesson.id, latestLesson);
       syncCourseContentInBackground();
       toast({ title: "Lecture updated", description: "Lecture changes were saved to Supabase." });
+      return true;
     } catch (error) {
       showMutationError("Unable to update lecture", error);
+      return false;
     }
   };
 
@@ -958,15 +971,18 @@ const AdminDashboard = () => {
 
     if (!question?.id) {
       showMutationError("Unable to update question", new Error("This question is missing its database id."));
-      return;
+      return false;
     }
 
     try {
-      await updateModuleQuestionRecord(question.id, question);
+      const latestQuestion = getLatestModuleQuestion(question.id) ?? question;
+      await updateModuleQuestionRecord(question.id, latestQuestion);
       syncCourseContentInBackground();
       toast({ title: "Question updated", description: "Module quiz changes were saved to Supabase." });
+      return true;
     } catch (error) {
       showMutationError("Unable to update question", error);
+      return false;
     }
   };
 
@@ -1148,7 +1164,7 @@ const AdminDashboard = () => {
   const saveSelectedTest = async () => {
     if (!selectedTest.dbId) {
       showMutationError("Unable to update test", new Error("This test is missing its database id."));
-      return;
+      return false;
     }
 
     try {
@@ -1160,8 +1176,10 @@ const AdminDashboard = () => {
       });
       syncCourseContentInBackground();
       toast({ title: "Practice test updated", description: "Test settings were saved to Supabase." });
+      return true;
     } catch (error) {
       showMutationError("Unable to update test", error);
+      return false;
     }
   };
 
@@ -1200,15 +1218,18 @@ const AdminDashboard = () => {
 
     if (!question?.id) {
       showMutationError("Unable to update question", new Error("This question is missing its database id."));
-      return;
+      return false;
     }
 
     try {
-      await updatePracticeTestQuestionRecord(question.id, question);
+      const latestQuestion = getLatestTestQuestion(question.id) ?? question;
+      await updatePracticeTestQuestionRecord(question.id, latestQuestion);
       syncCourseContentInBackground();
       toast({ title: "Question updated", description: "Timed-test question changes were saved." });
+      return true;
     } catch (error) {
       showMutationError("Unable to update question", error);
+      return false;
     }
   };
 
@@ -1435,7 +1456,7 @@ const AdminDashboard = () => {
                     <h2 className="mt-2 font-heading text-2xl font-semibold text-foreground">{selectedModule.title}</h2>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Dialog>
+                    <Dialog open={editModuleOpen} onOpenChange={setEditModuleOpen}>
                       <DialogTrigger asChild>
                         <Button variant="outline" size="sm">
                           <Pencil className="h-4 w-4" />
@@ -1457,9 +1478,17 @@ const AdminDashboard = () => {
                             <Textarea value={selectedModule.description} onChange={(event) => updateSelectedModule({ description: event.target.value })} className="min-h-[140px] bg-background/70" />
                           </div>
                           <div className="flex justify-end gap-3">
-                            <DialogClose asChild>
-                              <Button variant="outline" onClick={saveSelectedModule}>Done</Button>
-                            </DialogClose>
+                            <Button
+                              variant="outline"
+                              onClick={async () => {
+                                const saved = await saveSelectedModule();
+                                if (saved) {
+                                  setEditModuleOpen(false);
+                                }
+                              }}
+                            >
+                              Done
+                            </Button>
                           </div>
                         </div>
                       </DialogContent>
@@ -1500,7 +1529,7 @@ const AdminDashboard = () => {
                   </div>
                 </div>
 
-                <p className="text-sm leading-7 text-muted-foreground">Use the module editor to update the name and overview, then manage lectures and checkpoint questions below.</p>
+                <p className="text-sm leading-7 text-muted-foreground">{selectedModule.description}</p>
               </section>
 
               <section className="glass-card rounded-3xl p-6">
@@ -1578,7 +1607,10 @@ const AdminDashboard = () => {
                           <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted-foreground">{lesson.summary}</p>
                         </div>
 
-                        <Dialog>
+                        <Dialog
+                          open={lesson.id ? editLessonId === lesson.id : undefined}
+                          onOpenChange={(open) => setEditLessonId(open ? lesson.id ?? null : null)}
+                        >
                           <DialogTrigger asChild>
                             <Button variant="outline" size="sm" className="sm:shrink-0">
                               <Pencil className="h-4 w-4" />
@@ -1740,9 +1772,17 @@ const AdminDashboard = () => {
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
                                 </AlertDialog>
-                                <DialogClose asChild>
-                                  <Button variant="outline" onClick={() => saveLesson(index)}>Done</Button>
-                                </DialogClose>
+                                <Button
+                                  variant="outline"
+                                  onClick={async () => {
+                                    const saved = await saveLesson(index);
+                                    if (saved) {
+                                      setEditLessonId(null);
+                                    }
+                                  }}
+                                >
+                                  Done
+                                </Button>
                               </div>
                             </div>
                           </DialogContent>
@@ -1801,7 +1841,10 @@ const AdminDashboard = () => {
                           <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted-foreground">{question.explanation}</p>
                         </div>
 
-                        <Dialog>
+                        <Dialog
+                          open={question.id ? editModuleQuestionId === question.id : undefined}
+                          onOpenChange={(open) => setEditModuleQuestionId(open ? question.id ?? null : null)}
+                        >
                           <DialogTrigger asChild>
                             <Button variant="outline" size="sm" className="sm:shrink-0">
                               <Pencil className="h-4 w-4" />
@@ -1855,9 +1898,17 @@ const AdminDashboard = () => {
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
                                 </AlertDialog>
-                                <DialogClose asChild>
-                                  <Button variant="outline" onClick={() => saveModuleQuestion(questionIndex)}>Done</Button>
-                                </DialogClose>
+                                <Button
+                                  variant="outline"
+                                  onClick={async () => {
+                                    const saved = await saveModuleQuestion(questionIndex);
+                                    if (saved) {
+                                      setEditModuleQuestionId(null);
+                                    }
+                                  }}
+                                >
+                                  Done
+                                </Button>
                               </div>
                             </div>
                           </DialogContent>
@@ -1948,7 +1999,7 @@ const AdminDashboard = () => {
                     <h2 className="mt-2 font-heading text-2xl font-semibold text-foreground">{selectedTest.title}</h2>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Dialog>
+                    <Dialog open={editTestOpen} onOpenChange={setEditTestOpen}>
                       <DialogTrigger asChild>
                         <Button variant="outline" size="sm">
                           <Pencil className="h-4 w-4" />
@@ -1982,9 +2033,17 @@ const AdminDashboard = () => {
                             <Textarea value={selectedTest.description} onChange={(event) => updateSelectedTest({ description: event.target.value })} className="min-h-[120px] bg-background/70" />
                           </div>
                           <div className="flex justify-end gap-3 lg:col-span-2">
-                            <DialogClose asChild>
-                              <Button variant="outline" onClick={saveSelectedTest}>Done</Button>
-                            </DialogClose>
+                            <Button
+                              variant="outline"
+                              onClick={async () => {
+                                const saved = await saveSelectedTest();
+                                if (saved) {
+                                  setEditTestOpen(false);
+                                }
+                              }}
+                            >
+                              Done
+                            </Button>
                           </div>
                         </div>
                       </DialogContent>
@@ -2025,7 +2084,7 @@ const AdminDashboard = () => {
                   </div>
                 </div>
 
-                <p className="text-sm leading-7 text-muted-foreground">Use the test editor to update the test name, category, time limit, and overview, then manage the question bank below.</p>
+                <p className="text-sm leading-7 text-muted-foreground">{selectedTest.description}</p>
               </section>
 
               <section className="glass-card rounded-3xl p-6">
@@ -2076,7 +2135,10 @@ const AdminDashboard = () => {
                           <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted-foreground">{question.explanation}</p>
                         </div>
 
-                        <Dialog>
+                        <Dialog
+                          open={question.id ? editTestQuestionId === question.id : undefined}
+                          onOpenChange={(open) => setEditTestQuestionId(open ? question.id ?? null : null)}
+                        >
                           <DialogTrigger asChild>
                             <Button variant="outline" size="sm" className="sm:shrink-0">
                               <Pencil className="h-4 w-4" />
@@ -2130,9 +2192,17 @@ const AdminDashboard = () => {
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
                                 </AlertDialog>
-                                <DialogClose asChild>
-                                  <Button variant="outline" onClick={() => saveTestQuestion(questionIndex)}>Done</Button>
-                                </DialogClose>
+                                <Button
+                                  variant="outline"
+                                  onClick={async () => {
+                                    const saved = await saveTestQuestion(questionIndex);
+                                    if (saved) {
+                                      setEditTestQuestionId(null);
+                                    }
+                                  }}
+                                >
+                                  Done
+                                </Button>
                               </div>
                             </div>
                           </DialogContent>

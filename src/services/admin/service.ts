@@ -103,6 +103,12 @@ const getNextSortOrder = async (
   return (data?.sort_order ?? -1) + 1;
 };
 
+const ensureTouchedRow = <T>(row: T | null, action: string) => {
+  if (!row) {
+    throw new Error(`${action} did not update any rows. Confirm this record still exists and your admin session has permission.`);
+  }
+};
+
 export const fetchAdminUsers = async (): Promise<AdminUserRecord[]> => {
   const client = requireSupabase();
   const [{ data: profiles, error: profileError }, { data: moduleProgress, error: moduleProgressError }, { data: attempts, error: attemptError }] =
@@ -187,20 +193,24 @@ export const updateModule = async (moduleId: number, patch: Partial<ModuleInfo>)
     updates.description = patch.description.trim();
   }
 
-  const { error } = await client.from("modules").update(updates).eq("id", moduleId);
+  const { data, error } = await client.from("modules").update(updates).eq("id", moduleId).select("id").maybeSingle();
 
   if (error) {
     throw new Error(error.message);
   }
+
+  ensureTouchedRow(data, "Module update");
 };
 
 export const deleteModule = async (moduleId: number) => {
   const client = requireSupabase();
-  const { error } = await client.from("modules").delete().eq("id", moduleId);
+  const { data, error } = await client.from("modules").delete().eq("id", moduleId).select("id").maybeSingle();
 
   if (error) {
     throw new Error(error.message);
   }
+
+  ensureTouchedRow(data, "Module delete");
 };
 
 export const createLesson = async (moduleId: number, draft: ModuleLesson) => {
@@ -252,20 +262,24 @@ export const updateLesson = async (lessonId: number, patch: Partial<ModuleLesson
     updates.poster_path = patch.posterUrl?.trim() || null;
   }
 
-  const { error } = await client.from("lessons").update(updates).eq("id", lessonId);
+  const { data, error } = await client.from("lessons").update(updates).eq("id", lessonId).select("id").maybeSingle();
 
   if (error) {
     throw new Error(error.message);
   }
+
+  ensureTouchedRow(data, "Lecture update");
 };
 
 export const deleteLesson = async (lessonId: number) => {
   const client = requireSupabase();
-  const { error } = await client.from("lessons").delete().eq("id", lessonId);
+  const { data, error } = await client.from("lessons").delete().eq("id", lessonId).select("id").maybeSingle();
 
   if (error) {
     throw new Error(error.message);
   }
+
+  ensureTouchedRow(data, "Lecture delete");
 };
 
 export const createModuleQuestion = async (moduleId: number, draft: QuizQuestion) => {
@@ -318,20 +332,24 @@ export const updateModuleQuestion = async (questionId: number, patch: Partial<Qu
     updates.explanation = patch.explanation.trim();
   }
 
-  const { error } = await client.from("module_quiz_questions").update(updates).eq("id", questionId);
+  const { data, error } = await client.from("module_quiz_questions").update(updates).eq("id", questionId).select("id").maybeSingle();
 
   if (error) {
     throw new Error(error.message);
   }
+
+  ensureTouchedRow(data, "Module question update");
 };
 
 export const deleteModuleQuestion = async (questionId: number) => {
   const client = requireSupabase();
-  const { error } = await client.from("module_quiz_questions").delete().eq("id", questionId);
+  const { data, error } = await client.from("module_quiz_questions").delete().eq("id", questionId).select("id").maybeSingle();
 
   if (error) {
     throw new Error(error.message);
   }
+
+  ensureTouchedRow(data, "Module question delete");
 };
 
 export const createPracticeTest = async (draft: { title: string; description: string; category: string; time: number }) => {
@@ -375,20 +393,24 @@ export const updatePracticeTest = async (testId: number, patch: Partial<Practice
     updates.time_limit_minutes = patch.time;
   }
 
-  const { error } = await client.from("practice_tests").update(updates).eq("id", testId);
+  const { data, error } = await client.from("practice_tests").update(updates).eq("id", testId).select("id").maybeSingle();
 
   if (error) {
     throw new Error(error.message);
   }
+
+  ensureTouchedRow(data, "Practice test update");
 };
 
 export const deletePracticeTest = async (testId: number) => {
   const client = requireSupabase();
-  const { error } = await client.from("practice_tests").delete().eq("id", testId);
+  const { data, error } = await client.from("practice_tests").delete().eq("id", testId).select("id").maybeSingle();
 
   if (error) {
     throw new Error(error.message);
   }
+
+  ensureTouchedRow(data, "Practice test delete");
 };
 
 export const createPracticeTestQuestion = async (testId: number, draft: QuizQuestion) => {
@@ -441,20 +463,24 @@ export const updatePracticeTestQuestion = async (questionId: number, patch: Part
     updates.explanation = patch.explanation.trim();
   }
 
-  const { error } = await client.from("practice_test_questions").update(updates).eq("id", questionId);
+  const { data, error } = await client.from("practice_test_questions").update(updates).eq("id", questionId).select("id").maybeSingle();
 
   if (error) {
     throw new Error(error.message);
   }
+
+  ensureTouchedRow(data, "Practice test question update");
 };
 
 export const deletePracticeTestQuestion = async (questionId: number) => {
   const client = requireSupabase();
-  const { error } = await client.from("practice_test_questions").delete().eq("id", questionId);
+  const { data, error } = await client.from("practice_test_questions").delete().eq("id", questionId).select("id").maybeSingle();
 
   if (error) {
     throw new Error(error.message);
   }
+
+  ensureTouchedRow(data, "Practice test question delete");
 };
 
 export const updateAdminUser = async (
@@ -481,11 +507,13 @@ export const updateAdminUser = async (
     updates.status = patch.status;
   }
 
-  const { error } = await client.from("profiles").update(updates).eq("id", userId);
+  const { data, error } = await client.from("profiles").update(updates).eq("id", userId).select("id").maybeSingle();
 
   if (error) {
     throw new Error(error.message);
   }
+
+  ensureTouchedRow(data, "User update");
 };
 
 export const deleteAdminUser = async (userId: string) => {

@@ -107,19 +107,19 @@ export const uploadLessonAsset = async ({
   }
 
   const column = kind === "video" ? "video_path" : "poster_path";
-  const { error: updateError } = await withUploadTimeout(
-    supabase.from("lessons").update({ [column]: storagePath }).eq("id", lessonId),
+  const { data: updateData, error: updateError } = await withUploadTimeout(
+    supabase.from("lessons").update({ [column]: storagePath }).eq("id", lessonId).select("id").maybeSingle(),
     "Saving lesson media link",
   );
 
-  if (updateError) {
+  if (updateError || !updateData) {
     const { error: cleanupError } = await supabase.storage.from(bucket).remove([storagePath]);
 
     if (cleanupError) {
       console.error(`Unable to clean up ${kind} upload after database update failed`, cleanupError);
     }
 
-    throw new Error(updateError.message);
+    throw new Error(updateError?.message || "Lesson media link did not update any rows.");
   }
 
   if (previousPath && !isAbsoluteUrl(previousPath) && previousPath !== storagePath) {
@@ -149,10 +149,15 @@ export const removeLessonAsset = async ({
   const bucket = getBucketName(kind);
   const column = kind === "video" ? "video_path" : "poster_path";
 
-  const { error: updateError } = await supabase.from("lessons").update({ [column]: null }).eq("id", lessonId);
+  const { data: updateData, error: updateError } = await supabase
+    .from("lessons")
+    .update({ [column]: null })
+    .eq("id", lessonId)
+    .select("id")
+    .maybeSingle();
 
-  if (updateError) {
-    throw new Error(updateError.message);
+  if (updateError || !updateData) {
+    throw new Error(updateError?.message || "Lesson media link did not update any rows.");
   }
 
   if (currentPath && !isAbsoluteUrl(currentPath)) {
