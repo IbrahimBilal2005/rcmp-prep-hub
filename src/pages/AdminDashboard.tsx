@@ -67,6 +67,7 @@ import { getEmptyCourseContent } from "@/services/content/service";
 import { COURSE_CONTENT_QUERY_KEY, useCourseContent } from "@/services/content/useCourseContent";
 import { removeLessonAsset, uploadLessonAsset, validateLessonAssetFile } from "@/services/storage/lesson-assets";
 import { removeQuestionAsset, uploadQuestionAsset } from "@/services/storage/question-assets";
+import { withUploadTimeout } from "@/services/storage/image-upload";
 
 type AdminTab = "modules" | "tests" | "users";
 const EMPTY_ADMIN_USERS: AdminUserRecord[] = [];
@@ -437,11 +438,21 @@ const AdminDashboard = () => {
   const [newModuleQuestionDraft, setNewModuleQuestionDraft] = useState<QuizQuestion>(() => createNewQuestionDraft());
   const [newTestDraft, setNewTestDraft] = useState({ title: "", description: "", category: "General", time: 15 });
   const [newTestQuestionDraft, setNewTestQuestionDraft] = useState<QuizQuestion>(() => createNewQuestionDraft());
-  const [uploadingAssetKey, setUploadingAssetKey] = useState<string | null>(null);
+  const [uploadingAssetKeys, setUploadingAssetKeys] = useState<Record<string, boolean>>({});
   const [uploadedAssetLabels, setUploadedAssetLabels] = useState<Record<string, string>>({});
   const [assetStatusText, setAssetStatusText] = useState<Record<string, string>>({});
   const courseDraftsHydratedRef = useRef(false);
   const shouldSyncCourseDraftsRef = useRef(false);
+  const moduleDraftsRef = useRef(moduleDrafts);
+  const testDraftsRef = useRef(testDrafts);
+
+  useEffect(() => {
+    moduleDraftsRef.current = moduleDrafts;
+  }, [moduleDrafts]);
+
+  useEffect(() => {
+    testDraftsRef.current = testDrafts;
+  }, [testDrafts]);
 
   const refreshCourseContent = async ({ syncDrafts = true }: { syncDrafts?: boolean } = {}) => {
     if (syncDrafts) {
@@ -475,6 +486,65 @@ const AdminDashboard = () => {
     slot: string,
   ) => `${ownerType}-${questionId}-${slot}`;
 
+  const isAssetUploading = (assetKey: string) => Boolean(uploadingAssetKeys[assetKey]);
+
+  const setAssetUploading = (assetKey: string, uploading: boolean) => {
+    setUploadingAssetKeys((current) => {
+      const next = { ...current };
+
+      if (uploading) {
+        next[assetKey] = true;
+      } else {
+        delete next[assetKey];
+      }
+
+      return next;
+    });
+  };
+
+  const getLatestModuleQuestion = (questionId: number) =>
+    moduleDraftsRef.current.flatMap((module) => module.quiz).find((question) => question.id === questionId) ?? null;
+
+  const getLatestTestQuestion = (questionId: number) =>
+    testDraftsRef.current.flatMap((test) => test.testQuestions).find((question) => question.id === questionId) ?? null;
+
+  const patchModuleQuestionById = (questionId: number, updater: (question: QuizQuestion) => QuizQuestion) => {
+    setModuleDrafts((current) =>
+      current.map((module) => ({
+        ...module,
+        quiz: module.quiz.map((question) => (question.id === questionId ? updater(question) : question)),
+      })),
+    );
+  };
+
+  const patchTestQuestionById = (questionId: number, updater: (question: QuizQuestion) => QuizQuestion) => {
+    setTestDrafts((current) =>
+      current.map((test) => ({
+        ...test,
+        testQuestions: test.testQuestions.map((question) => (question.id === questionId ? updater(question) : question)),
+      })),
+    );
+  };
+
+  const applyQuestionAssetPatch = (
+    question: QuizQuestion,
+    nextPath: string | null,
+    optionIndex?: number,
+    previewUrl: string | null = null,
+  ): QuizQuestion =>
+    optionIndex === undefined
+      ? {
+          ...question,
+          questionImagePath: nextPath,
+          questionImageUrl: previewUrl,
+        }
+      : {
+          ...question,
+          options: question.options.map((option, index) =>
+            index === optionIndex ? { ...option, imagePath: nextPath, imageUrl: previewUrl } : option,
+          ),
+        };
+
   const handleLessonAssetUpload = async (
     lessonIndex: number,
     kind: "video" | "poster",
@@ -492,7 +562,7 @@ const AdminDashboard = () => {
     }
 
     const assetKey = `${lesson.id}-${kind}`;
-    setUploadingAssetKey(assetKey);
+    setAssetUploading(assetKey, true);
     setAssetStatusText((current) => ({
       ...current,
       [assetKey]: "Uploading to Supabase Storage...",
@@ -516,7 +586,7 @@ const AdminDashboard = () => {
         ...current,
         [assetKey]: "Upload complete",
       }));
-      setUploadingAssetKey(null);
+      setAssetUploading(assetKey, false);
       syncCourseContentInBackground();
       toast({
         title: kind === "video" ? "Video uploaded" : "Poster uploaded",
@@ -529,7 +599,7 @@ const AdminDashboard = () => {
       }));
       showMutationError(`Unable to upload ${kind}`, error);
     } finally {
-      setUploadingAssetKey((current) => (current === assetKey ? null : current));
+      setAssetUploading(assetKey, false);
     }
   };
 
@@ -548,7 +618,7 @@ const AdminDashboard = () => {
       return;
     }
 
-    setUploadingAssetKey(assetKey);
+    setAssetUploading(assetKey, true);
     setAssetStatusText((current) => ({
       ...current,
       [assetKey]: "Removing linked file...",
@@ -570,7 +640,7 @@ const AdminDashboard = () => {
         ...current,
         [assetKey]: "File removed",
       }));
-      setUploadingAssetKey(null);
+      setAssetUploading(assetKey, false);
       syncCourseContentInBackground();
       toast({
         title: kind === "video" ? "Video removed" : "Poster removed",
@@ -583,7 +653,7 @@ const AdminDashboard = () => {
       }));
       showMutationError(`Unable to remove ${kind}`, error);
     } finally {
-      setUploadingAssetKey((current) => (current === assetKey ? null : current));
+      setAssetUploading(assetKey, false);
     }
   };
 
@@ -708,14 +778,15 @@ const AdminDashboard = () => {
 
     const slot = optionIndex === undefined ? "prompt" : `option-${optionIndex}`;
     const assetKey = getQuestionAssetKey("module-question", question.id, slot);
-    setUploadingAssetKey(assetKey);
-    setAssetStatusText((current) => ({ ...current, [assetKey]: "Uploading question image..." }));
+    setAssetUploading(assetKey, true);
+    setAssetStatusText((current) => ({ ...current, [assetKey]: "Preparing and uploading image..." }));
 
+    let nextPath: string | null = null;
     try {
       const previousPath = optionIndex === undefined
         ? question.questionImagePath
         : question.options[optionIndex]?.imagePath ?? null;
-      const nextPath = await uploadQuestionAsset({
+      nextPath = await uploadQuestionAsset({
         ownerType: "module",
         ownerId: selectedModule.id,
         questionId: question.id,
@@ -723,31 +794,40 @@ const AdminDashboard = () => {
         file,
         previousPath,
       });
-      const nextQuestion =
-        optionIndex === undefined
-          ? { ...question, questionImagePath: nextPath, questionImageUrl: URL.createObjectURL(file) }
-          : {
-              ...question,
-              options: question.options.map((option, index) =>
-                index === optionIndex ? { ...option, imagePath: nextPath, imageUrl: URL.createObjectURL(file) } : option,
-              ),
-            };
 
-      await updateModuleQuestionRecord(question.id, nextQuestion);
-      updateModuleQuestion(questionIndex, nextQuestion);
+      setAssetStatusText((current) => ({ ...current, [assetKey]: "Saving image link to database..." }));
+
+      if (optionIndex === undefined) {
+        await withUploadTimeout(updateModuleQuestionRecord(question.id, { questionImagePath: nextPath }), "Saving image link");
+      } else {
+        const latestQuestion = getLatestModuleQuestion(question.id) ?? question;
+        const nextQuestion = applyQuestionAssetPatch(latestQuestion, nextPath, optionIndex);
+        await withUploadTimeout(updateModuleQuestionRecord(question.id, { options: nextQuestion.options }), "Saving image link");
+      }
+
+      const previewUrl = URL.createObjectURL(file);
+      patchModuleQuestionById(question.id, (currentQuestion) =>
+        applyQuestionAssetPatch(currentQuestion, nextPath, optionIndex, previewUrl),
+      );
       setUploadedAssetLabels((current) => ({ ...current, [assetKey]: file.name }));
       setAssetStatusText((current) => ({ ...current, [assetKey]: "Upload complete" }));
-      setUploadingAssetKey(null);
+      setAssetUploading(assetKey, false);
       syncCourseContentInBackground();
       toast({ title: "Question image uploaded", description: `${file.name} is now linked to this module question.` });
     } catch (error) {
+      if (nextPath) {
+        void removeQuestionAsset(nextPath).catch((removeError) => {
+          console.error("Unable to clean up uploaded question image after database save failed", removeError);
+        });
+      }
+
       setAssetStatusText((current) => ({
         ...current,
         [assetKey]: error instanceof Error ? error.message : "Upload failed",
       }));
       showMutationError("Unable to upload image", error);
     } finally {
-      setUploadingAssetKey((current) => (current === assetKey ? null : current));
+      setAssetUploading(assetKey, false);
     }
   };
 
@@ -769,24 +849,30 @@ const AdminDashboard = () => {
       return;
     }
 
-    setUploadingAssetKey(assetKey);
-    setAssetStatusText((current) => ({ ...current, [assetKey]: "Removing question image..." }));
+    setAssetUploading(assetKey, true);
+    setAssetStatusText((current) => ({ ...current, [assetKey]: "Removing image link..." }));
 
     try {
-      await removeQuestionAsset(currentPath);
-      const nextQuestion =
-        optionIndex === undefined
-          ? { ...question, questionImagePath: null, questionImageUrl: null }
-          : {
-              ...question,
-              options: question.options.map((option, index) =>
-                index === optionIndex ? { ...option, imagePath: null, imageUrl: null } : option,
-              ),
-            };
-      await updateModuleQuestionRecord(question.id, nextQuestion);
-      updateModuleQuestion(questionIndex, nextQuestion);
+      if (optionIndex === undefined) {
+        await withUploadTimeout(updateModuleQuestionRecord(question.id, { questionImagePath: null }), "Removing image link");
+      } else {
+        const latestQuestion = getLatestModuleQuestion(question.id) ?? question;
+        const nextQuestion = applyQuestionAssetPatch(latestQuestion, null, optionIndex);
+        await withUploadTimeout(updateModuleQuestionRecord(question.id, { options: nextQuestion.options }), "Removing image link");
+      }
+
+      patchModuleQuestionById(question.id, (currentQuestion) => applyQuestionAssetPatch(currentQuestion, null, optionIndex));
+      setUploadedAssetLabels((current) => {
+        const next = { ...current };
+        delete next[assetKey];
+        return next;
+      });
+      setAssetStatusText((current) => ({ ...current, [assetKey]: "Cleaning up storage file..." }));
+      void removeQuestionAsset(currentPath).catch((removeError) => {
+        console.error("Unable to remove unlinked module question image from storage", removeError);
+      });
       setAssetStatusText((current) => ({ ...current, [assetKey]: "Image removed" }));
-      setUploadingAssetKey(null);
+      setAssetUploading(assetKey, false);
       syncCourseContentInBackground();
       toast({ title: "Question image removed", description: "The image was removed from this module question." });
     } catch (error) {
@@ -796,7 +882,7 @@ const AdminDashboard = () => {
       }));
       showMutationError("Unable to remove image", error);
     } finally {
-      setUploadingAssetKey((current) => (current === assetKey ? null : current));
+      setAssetUploading(assetKey, false);
     }
   };
 
@@ -951,14 +1037,15 @@ const AdminDashboard = () => {
 
     const slot = optionIndex === undefined ? "prompt" : `option-${optionIndex}`;
     const assetKey = getQuestionAssetKey("test-question", question.id, slot);
-    setUploadingAssetKey(assetKey);
-    setAssetStatusText((current) => ({ ...current, [assetKey]: "Uploading question image..." }));
+    setAssetUploading(assetKey, true);
+    setAssetStatusText((current) => ({ ...current, [assetKey]: "Preparing and uploading image..." }));
 
+    let nextPath: string | null = null;
     try {
       const previousPath = optionIndex === undefined
         ? question.questionImagePath
         : question.options[optionIndex]?.imagePath ?? null;
-      const nextPath = await uploadQuestionAsset({
+      nextPath = await uploadQuestionAsset({
         ownerType: "test",
         ownerId: selectedTest.dbId,
         questionId: question.id,
@@ -966,31 +1053,40 @@ const AdminDashboard = () => {
         file,
         previousPath,
       });
-      const nextQuestion =
-        optionIndex === undefined
-          ? { ...question, questionImagePath: nextPath, questionImageUrl: URL.createObjectURL(file) }
-          : {
-              ...question,
-              options: question.options.map((option, index) =>
-                index === optionIndex ? { ...option, imagePath: nextPath, imageUrl: URL.createObjectURL(file) } : option,
-              ),
-            };
 
-      await updatePracticeTestQuestionRecord(question.id, nextQuestion);
-      updateTestQuestion(questionIndex, nextQuestion);
+      setAssetStatusText((current) => ({ ...current, [assetKey]: "Saving image link to database..." }));
+
+      if (optionIndex === undefined) {
+        await withUploadTimeout(updatePracticeTestQuestionRecord(question.id, { questionImagePath: nextPath }), "Saving image link");
+      } else {
+        const latestQuestion = getLatestTestQuestion(question.id) ?? question;
+        const nextQuestion = applyQuestionAssetPatch(latestQuestion, nextPath, optionIndex);
+        await withUploadTimeout(updatePracticeTestQuestionRecord(question.id, { options: nextQuestion.options }), "Saving image link");
+      }
+
+      const previewUrl = URL.createObjectURL(file);
+      patchTestQuestionById(question.id, (currentQuestion) =>
+        applyQuestionAssetPatch(currentQuestion, nextPath, optionIndex, previewUrl),
+      );
       setUploadedAssetLabels((current) => ({ ...current, [assetKey]: file.name }));
       setAssetStatusText((current) => ({ ...current, [assetKey]: "Upload complete" }));
-      setUploadingAssetKey(null);
+      setAssetUploading(assetKey, false);
       syncCourseContentInBackground();
       toast({ title: "Question image uploaded", description: `${file.name} is now linked to this test question.` });
     } catch (error) {
+      if (nextPath) {
+        void removeQuestionAsset(nextPath).catch((removeError) => {
+          console.error("Unable to clean up uploaded test question image after database save failed", removeError);
+        });
+      }
+
       setAssetStatusText((current) => ({
         ...current,
         [assetKey]: error instanceof Error ? error.message : "Upload failed",
       }));
       showMutationError("Unable to upload image", error);
     } finally {
-      setUploadingAssetKey((current) => (current === assetKey ? null : current));
+      setAssetUploading(assetKey, false);
     }
   };
 
@@ -1012,24 +1108,30 @@ const AdminDashboard = () => {
       return;
     }
 
-    setUploadingAssetKey(assetKey);
-    setAssetStatusText((current) => ({ ...current, [assetKey]: "Removing question image..." }));
+    setAssetUploading(assetKey, true);
+    setAssetStatusText((current) => ({ ...current, [assetKey]: "Removing image link..." }));
 
     try {
-      await removeQuestionAsset(currentPath);
-      const nextQuestion =
-        optionIndex === undefined
-          ? { ...question, questionImagePath: null, questionImageUrl: null }
-          : {
-              ...question,
-              options: question.options.map((option, index) =>
-                index === optionIndex ? { ...option, imagePath: null, imageUrl: null } : option,
-              ),
-            };
-      await updatePracticeTestQuestionRecord(question.id, nextQuestion);
-      updateTestQuestion(questionIndex, nextQuestion);
+      if (optionIndex === undefined) {
+        await withUploadTimeout(updatePracticeTestQuestionRecord(question.id, { questionImagePath: null }), "Removing image link");
+      } else {
+        const latestQuestion = getLatestTestQuestion(question.id) ?? question;
+        const nextQuestion = applyQuestionAssetPatch(latestQuestion, null, optionIndex);
+        await withUploadTimeout(updatePracticeTestQuestionRecord(question.id, { options: nextQuestion.options }), "Removing image link");
+      }
+
+      patchTestQuestionById(question.id, (currentQuestion) => applyQuestionAssetPatch(currentQuestion, null, optionIndex));
+      setUploadedAssetLabels((current) => {
+        const next = { ...current };
+        delete next[assetKey];
+        return next;
+      });
+      setAssetStatusText((current) => ({ ...current, [assetKey]: "Cleaning up storage file..." }));
+      void removeQuestionAsset(currentPath).catch((removeError) => {
+        console.error("Unable to remove unlinked test question image from storage", removeError);
+      });
       setAssetStatusText((current) => ({ ...current, [assetKey]: "Image removed" }));
-      setUploadingAssetKey(null);
+      setAssetUploading(assetKey, false);
       syncCourseContentInBackground();
       toast({ title: "Question image removed", description: "The image was removed from this timed-test question." });
     } catch (error) {
@@ -1039,7 +1141,7 @@ const AdminDashboard = () => {
       }));
       showMutationError("Unable to remove image", error);
     } finally {
-      setUploadingAssetKey((current) => (current === assetKey ? null : current));
+      setAssetUploading(assetKey, false);
     }
   };
 
@@ -1516,7 +1618,7 @@ const AdminDashboard = () => {
                                       type="file"
                                       accept="video/mp4,video/webm,video/quicktime"
                                       className="hidden"
-                                      disabled={uploadingAssetKey === `${lesson.id}-video`}
+                                      disabled={isAssetUploading(`${lesson.id}-video`)}
                                       onChange={(event) => {
                                         const file = event.target.files?.[0] ?? null;
                                         void handleLessonAssetUpload(index, "video", file);
@@ -1540,7 +1642,7 @@ const AdminDashboard = () => {
                                           <Button
                                             variant="outline"
                                             size="sm"
-                                            disabled={uploadingAssetKey === `${lesson.id}-video`}
+                                            disabled={isAssetUploading(`${lesson.id}-video`)}
                                             onClick={() => void handleRemoveLessonAsset(index, "video")}
                                           >
                                             Remove
@@ -1548,12 +1650,12 @@ const AdminDashboard = () => {
                                         ) : null}
                                         <label htmlFor={`lesson-video-upload-${lesson.id}`}>
                                           <Button asChild variant="outline" size="sm" className="cursor-pointer">
-                                            <span>{uploadingAssetKey === `${lesson.id}-video` ? "Uploading..." : "Choose file"}</span>
+                                            <span>{isAssetUploading(`${lesson.id}-video`) ? "Uploading..." : "Choose file"}</span>
                                           </Button>
                                         </label>
                                       </div>
                                     </div>
-                                    {uploadingAssetKey === `${lesson.id}-video` ? <Progress value={66} className="h-2" /> : null}
+                                    {isAssetUploading(`${lesson.id}-video`) ? <Progress value={66} className="h-2" /> : null}
                                   </div>
                                   <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Upload poster image</label>
@@ -1562,7 +1664,7 @@ const AdminDashboard = () => {
                                       type="file"
                                       accept="image/png,image/jpeg,image/webp"
                                       className="hidden"
-                                      disabled={uploadingAssetKey === `${lesson.id}-poster`}
+                                      disabled={isAssetUploading(`${lesson.id}-poster`)}
                                       onChange={(event) => {
                                         const file = event.target.files?.[0] ?? null;
                                         void handleLessonAssetUpload(index, "poster", file);
@@ -1586,7 +1688,7 @@ const AdminDashboard = () => {
                                           <Button
                                             variant="outline"
                                             size="sm"
-                                            disabled={uploadingAssetKey === `${lesson.id}-poster`}
+                                            disabled={isAssetUploading(`${lesson.id}-poster`)}
                                             onClick={() => void handleRemoveLessonAsset(index, "poster")}
                                           >
                                             Remove
@@ -1594,12 +1696,12 @@ const AdminDashboard = () => {
                                         ) : null}
                                         <label htmlFor={`lesson-poster-upload-${lesson.id}`}>
                                           <Button asChild variant="outline" size="sm" className="cursor-pointer">
-                                            <span>{uploadingAssetKey === `${lesson.id}-poster` ? "Uploading..." : "Choose file"}</span>
+                                            <span>{isAssetUploading(`${lesson.id}-poster`) ? "Uploading..." : "Choose file"}</span>
                                           </Button>
                                         </label>
                                       </div>
                                     </div>
-                                    {uploadingAssetKey === `${lesson.id}-poster` ? <Progress value={66} className="h-2" /> : null}
+                                    {isAssetUploading(`${lesson.id}-poster`) ? <Progress value={66} className="h-2" /> : null}
                                   </div>
                                 </div>
                                 {(uploadedAssetLabels[`${lesson.id}-video`] || uploadedAssetLabels[`${lesson.id}-poster`]) && (
@@ -1722,13 +1824,13 @@ const AdminDashboard = () => {
                                 onAddOption={() => addModuleQuestionOption(questionIndex)}
                                 onRemoveOption={(optionIndex) => removeModuleQuestionOption(questionIndex, optionIndex)}
                                 questionAssetControl={{
-                                  busy: uploadingAssetKey === getQuestionAssetKey("module-question", question.id ?? -1, "prompt"),
+                                  busy: isAssetUploading(getQuestionAssetKey("module-question", question.id ?? -1, "prompt")), 
                                   statusText: assetStatusText[getQuestionAssetKey("module-question", question.id ?? -1, "prompt")],
                                   onUpload: question.id ? (file) => { void handleModuleQuestionAssetUpload(questionIndex, file); } : undefined,
                                   onRemove: question.questionImagePath ? () => { void handleRemoveModuleQuestionAsset(questionIndex); } : undefined,
                                 }}
                                 getOptionAssetControl={(optionIndex) => ({
-                                  busy: uploadingAssetKey === getQuestionAssetKey("module-question", question.id ?? -1, `option-${optionIndex}`),
+                                  busy: isAssetUploading(getQuestionAssetKey("module-question", question.id ?? -1, `option-${optionIndex}`)), 
                                   statusText: assetStatusText[getQuestionAssetKey("module-question", question.id ?? -1, `option-${optionIndex}`)],
                                   onUpload: question.id ? (file) => { void handleModuleQuestionAssetUpload(questionIndex, file, optionIndex); } : undefined,
                                   onRemove: question.options[optionIndex]?.imagePath ? () => { void handleRemoveModuleQuestionAsset(questionIndex, optionIndex); } : undefined,
@@ -1997,13 +2099,13 @@ const AdminDashboard = () => {
                                 onAddOption={() => addTestQuestionOption(questionIndex)}
                                 onRemoveOption={(optionIndex) => removeTestQuestionOption(questionIndex, optionIndex)}
                                 questionAssetControl={{
-                                  busy: uploadingAssetKey === getQuestionAssetKey("test-question", question.id ?? -1, "prompt"),
+                                  busy: isAssetUploading(getQuestionAssetKey("test-question", question.id ?? -1, "prompt")), 
                                   statusText: assetStatusText[getQuestionAssetKey("test-question", question.id ?? -1, "prompt")],
                                   onUpload: question.id ? (file) => { void handleTestQuestionAssetUpload(questionIndex, file); } : undefined,
                                   onRemove: question.questionImagePath ? () => { void handleRemoveTestQuestionAsset(questionIndex); } : undefined,
                                 }}
                                 getOptionAssetControl={(optionIndex) => ({
-                                  busy: uploadingAssetKey === getQuestionAssetKey("test-question", question.id ?? -1, `option-${optionIndex}`),
+                                  busy: isAssetUploading(getQuestionAssetKey("test-question", question.id ?? -1, `option-${optionIndex}`)), 
                                   statusText: assetStatusText[getQuestionAssetKey("test-question", question.id ?? -1, `option-${optionIndex}`)],
                                   onUpload: question.id ? (file) => { void handleTestQuestionAssetUpload(questionIndex, file, optionIndex); } : undefined,
                                   onRemove: question.options[optionIndex]?.imagePath ? () => { void handleRemoveTestQuestionAsset(questionIndex, optionIndex); } : undefined,
@@ -2183,3 +2285,4 @@ const AdminDashboard = () => {
 };
 
 export default AdminDashboard;
+

@@ -46,7 +46,10 @@ export const resolveQuestionAssetUrl = async (path: string | null) => {
     return cached.url;
   }
 
-  const { data, error } = await supabase.storage.from(QUESTION_IMAGE_BUCKET).createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+  const { data, error } = await withUploadTimeout(
+    supabase.storage.from(QUESTION_IMAGE_BUCKET).createSignedUrl(path, SIGNED_URL_TTL_SECONDS),
+    "Question image load",
+  );
 
   if (error) {
     console.error("Unable to resolve question image URL", error);
@@ -81,7 +84,7 @@ export const uploadQuestionAsset = async ({
   }
 
   validateQuestionImageFile(file);
-  const uploadFile = await optimizeImageForUpload(file);
+  const uploadFile = await withUploadTimeout(optimizeImageForUpload(file), "Image optimization");
   validateQuestionImageFile(uploadFile);
 
   const fileName = sanitizeFileName(uploadFile.name || `question-image-${Date.now()}`);

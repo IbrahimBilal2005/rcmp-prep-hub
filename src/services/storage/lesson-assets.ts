@@ -57,7 +57,10 @@ export const resolveLessonAssetUrl = async (kind: LessonAssetKind, path: string 
     return null;
   }
 
-  const { data, error } = await supabase.storage.from(getBucketName(kind)).createSignedUrl(path, 60 * 60);
+  const { data, error } = await withUploadTimeout(
+    supabase.storage.from(getBucketName(kind)).createSignedUrl(path, 60 * 60),
+    `${kind === "video" ? "Video" : "Poster"} load`,
+  );
 
   if (error) {
     console.error(`Unable to resolve ${kind} asset URL`, error);
@@ -85,7 +88,7 @@ export const uploadLessonAsset = async ({
   }
 
   validateLessonAssetFile(kind, file);
-  const uploadFile = kind === "poster" ? await optimizeImageForUpload(file) : file;
+  const uploadFile = kind === "poster" ? await withUploadTimeout(optimizeImageForUpload(file), "Poster optimization") : file;
   validateLessonAssetFile(kind, uploadFile);
 
   const bucket = getBucketName(kind);
@@ -104,9 +107,18 @@ export const uploadLessonAsset = async ({
   }
 
   const column = kind === "video" ? "video_path" : "poster_path";
-  const { error: updateError } = await supabase.from("lessons").update({ [column]: storagePath }).eq("id", lessonId);
+  const { error: updateError } = await withUploadTimeout(
+    supabase.from("lessons").update({ [column]: storagePath }).eq("id", lessonId),
+    "Saving lesson media link",
+  );
 
   if (updateError) {
+    const { error: cleanupError } = await supabase.storage.from(bucket).remove([storagePath]);
+
+    if (cleanupError) {
+      console.error(`Unable to clean up ${kind} upload after database update failed`, cleanupError);
+    }
+
     throw new Error(updateError.message);
   }
 
@@ -147,7 +159,7 @@ export const removeLessonAsset = async ({
     const { error: removeError } = await supabase.storage.from(bucket).remove([currentPath]);
 
     if (removeError) {
-      throw new Error(removeError.message);
+      console.error(`Unable to remove unlinked ${kind} asset from storage`, removeError);
     }
   }
 };
