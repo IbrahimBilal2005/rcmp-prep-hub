@@ -103,22 +103,13 @@ const getNextSortOrder = async (
   return (data?.sort_order ?? -1) + 1;
 };
 
-const ensureTouchedRow = <T>(row: T | null, action: string) => {
+const ensureTouchedRow = (row: unknown, action: string) => {
   if (!row) {
     throw new Error(`${action} did not update any rows. Confirm this record still exists and your admin session has permission.`);
   }
 };
 
-const createOptionPlaceholders = (options: unknown): QuizQuestion["options"] =>
-  Array.isArray(options)
-    ? options.map(() => ({ text: "", imagePath: null, imageUrl: null }))
-    : [];
-
-const getQuestionCorrectnessContext = async (
-  table: "module_quiz_questions" | "practice_test_questions",
-  questionId: number,
-  patch: Partial<QuizQuestion>,
-) => {
+const getPatchedCorrectnessContext = (patch: Partial<QuizQuestion>) => {
   if (Array.isArray(patch.options)) {
     return {
       options: patch.options,
@@ -127,29 +118,17 @@ const getQuestionCorrectnessContext = async (
     } as QuizQuestion;
   }
 
-  const client = requireSupabase();
-  const { data, error } = await client
-    .from(table)
-    .select("options, correct_index, correct_indexes")
-    .eq("id", questionId)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  ensureTouchedRow(data, "Question correctness lookup");
+  const indexes = Array.isArray(patch.correctIndexes)
+    ? patch.correctIndexes.filter((value): value is number => Number.isInteger(value))
+    : typeof patch.correctIndex === "number"
+      ? [patch.correctIndex]
+      : [];
+  const optionCount = indexes.length > 0 ? Math.max(...indexes) + 1 : 0;
 
   return {
-    options: createOptionPlaceholders(data.options),
-    correctIndex: patch.correctIndex ?? data.correct_index ?? null,
-    correctIndexes: Array.isArray(patch.correctIndexes)
-      ? patch.correctIndexes
-      : typeof patch.correctIndex === "number"
-        ? []
-        : Array.isArray(data.correct_indexes)
-          ? data.correct_indexes.filter((value): value is number => Number.isInteger(value))
-          : [],
+    options: Array.from({ length: optionCount }, () => ({ text: "", imagePath: null, imageUrl: null })),
+    correctIndex: patch.correctIndex ?? indexes[0] ?? null,
+    correctIndexes: indexes,
   } as QuizQuestion;
 };
 
@@ -363,7 +342,7 @@ export const updateModuleQuestion = async (questionId: number, patch: Partial<Qu
   }
 
   if ("correctIndex" in patch || Array.isArray(patch.correctIndexes)) {
-    const nextQuestion = await getQuestionCorrectnessContext("module_quiz_questions", questionId, patch);
+    const nextQuestion = getPatchedCorrectnessContext(patch);
     updates.correct_index = getPrimaryCorrectIndex(nextQuestion);
     updates.correct_indexes = getCorrectIndexes(nextQuestion);
   }
@@ -372,13 +351,13 @@ export const updateModuleQuestion = async (questionId: number, patch: Partial<Qu
     updates.explanation = patch.explanation.trim();
   }
 
-  const { data, error } = await client.from("module_quiz_questions").update(updates).eq("id", questionId).select("id").maybeSingle();
+  const { count, error } = await client.from("module_quiz_questions").update(updates, { count: "exact" }).eq("id", questionId);
 
   if (error) {
     throw new Error(error.message);
   }
 
-  ensureTouchedRow(data, "Module question update");
+  ensureTouchedRow(count, "Module question update");
 };
 
 export const deleteModuleQuestion = async (questionId: number) => {
@@ -490,7 +469,7 @@ export const updatePracticeTestQuestion = async (questionId: number, patch: Part
   }
 
   if ("correctIndex" in patch || Array.isArray(patch.correctIndexes)) {
-    const nextQuestion = await getQuestionCorrectnessContext("practice_test_questions", questionId, patch);
+    const nextQuestion = getPatchedCorrectnessContext(patch);
     updates.correct_index = getPrimaryCorrectIndex(nextQuestion);
     updates.correct_indexes = getCorrectIndexes(nextQuestion);
   }
@@ -499,13 +478,13 @@ export const updatePracticeTestQuestion = async (questionId: number, patch: Part
     updates.explanation = patch.explanation.trim();
   }
 
-  const { data, error } = await client.from("practice_test_questions").update(updates).eq("id", questionId).select("id").maybeSingle();
+  const { count, error } = await client.from("practice_test_questions").update(updates, { count: "exact" }).eq("id", questionId);
 
   if (error) {
     throw new Error(error.message);
   }
 
-  ensureTouchedRow(data, "Practice test question update");
+  ensureTouchedRow(count, "Practice test question update");
 };
 
 export const deletePracticeTestQuestion = async (questionId: number) => {
