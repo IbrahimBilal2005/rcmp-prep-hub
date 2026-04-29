@@ -109,6 +109,50 @@ const ensureTouchedRow = <T>(row: T | null, action: string) => {
   }
 };
 
+const createOptionPlaceholders = (options: unknown): QuizQuestion["options"] =>
+  Array.isArray(options)
+    ? options.map(() => ({ text: "", imagePath: null, imageUrl: null }))
+    : [];
+
+const getQuestionCorrectnessContext = async (
+  table: "module_quiz_questions" | "practice_test_questions",
+  questionId: number,
+  patch: Partial<QuizQuestion>,
+) => {
+  if (Array.isArray(patch.options)) {
+    return {
+      options: patch.options,
+      correctIndex: patch.correctIndex ?? null,
+      correctIndexes: patch.correctIndexes ?? [],
+    } as QuizQuestion;
+  }
+
+  const client = requireSupabase();
+  const { data, error } = await client
+    .from(table)
+    .select("options, correct_index, correct_indexes")
+    .eq("id", questionId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  ensureTouchedRow(data, "Question correctness lookup");
+
+  return {
+    options: createOptionPlaceholders(data.options),
+    correctIndex: patch.correctIndex ?? data.correct_index ?? null,
+    correctIndexes: Array.isArray(patch.correctIndexes)
+      ? patch.correctIndexes
+      : typeof patch.correctIndex === "number"
+        ? []
+        : Array.isArray(data.correct_indexes)
+          ? data.correct_indexes.filter((value): value is number => Number.isInteger(value))
+          : [],
+  } as QuizQuestion;
+};
+
 export const fetchAdminUsers = async (): Promise<AdminUserRecord[]> => {
   const client = requireSupabase();
   const [{ data: profiles, error: profileError }, { data: moduleProgress, error: moduleProgressError }, { data: attempts, error: attemptError }] =
@@ -319,11 +363,7 @@ export const updateModuleQuestion = async (questionId: number, patch: Partial<Qu
   }
 
   if ("correctIndex" in patch || Array.isArray(patch.correctIndexes)) {
-    const nextQuestion = {
-      options: Array.isArray(patch.options) ? patch.options : [],
-      correctIndex: patch.correctIndex ?? null,
-      correctIndexes: patch.correctIndexes ?? [],
-    } as QuizQuestion;
+    const nextQuestion = await getQuestionCorrectnessContext("module_quiz_questions", questionId, patch);
     updates.correct_index = getPrimaryCorrectIndex(nextQuestion);
     updates.correct_indexes = getCorrectIndexes(nextQuestion);
   }
@@ -450,11 +490,7 @@ export const updatePracticeTestQuestion = async (questionId: number, patch: Part
   }
 
   if ("correctIndex" in patch || Array.isArray(patch.correctIndexes)) {
-    const nextQuestion = {
-      options: Array.isArray(patch.options) ? patch.options : [],
-      correctIndex: patch.correctIndex ?? null,
-      correctIndexes: patch.correctIndexes ?? [],
-    } as QuizQuestion;
+    const nextQuestion = await getQuestionCorrectnessContext("practice_test_questions", questionId, patch);
     updates.correct_index = getPrimaryCorrectIndex(nextQuestion);
     updates.correct_indexes = getCorrectIndexes(nextQuestion);
   }

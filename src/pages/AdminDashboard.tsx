@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -63,7 +63,7 @@ import {
   updatePracticeTest as updatePracticeTestRecord,
   updatePracticeTestQuestion as updatePracticeTestQuestionRecord,
 } from "@/services/admin/service";
-import { getEmptyCourseContent } from "@/services/content/service";
+import { fetchCourseContent, getEmptyCourseContent } from "@/services/content/service";
 import { COURSE_CONTENT_QUERY_KEY, useCourseContent } from "@/services/content/useCourseContent";
 import { removeLessonAsset, uploadLessonAsset, validateLessonAssetFile } from "@/services/storage/lesson-assets";
 import { removeQuestionAsset, uploadQuestionAsset } from "@/services/storage/question-assets";
@@ -446,8 +446,7 @@ const AdminDashboard = () => {
   const [uploadingAssetKeys, setUploadingAssetKeys] = useState<Record<string, boolean>>({});
   const [uploadedAssetLabels, setUploadedAssetLabels] = useState<Record<string, string>>({});
   const [assetStatusText, setAssetStatusText] = useState<Record<string, string>>({});
-  const courseDraftsHydratedRef = useRef(false);
-  const shouldSyncCourseDraftsRef = useRef(false);
+  const [savingActionKeys, setSavingActionKeys] = useState<Record<string, boolean>>({});
   const moduleDraftsRef = useRef(moduleDrafts);
   const testDraftsRef = useRef(testDrafts);
 
@@ -459,13 +458,24 @@ const AdminDashboard = () => {
     testDraftsRef.current = testDrafts;
   }, [testDrafts]);
 
-  const refreshCourseContent = async ({ syncDrafts = true }: { syncDrafts?: boolean } = {}) => {
-    if (syncDrafts) {
-      shouldSyncCourseDraftsRef.current = true;
-    }
+  const hydrateCourseDrafts = useCallback((nextModules: ModuleInfo[], nextPracticeTests: PracticeTest[]) => {
+    setModuleDrafts(createModuleDrafts(nextModules));
+    setTestDrafts(createTestDrafts(nextPracticeTests));
+    setSelectedModuleId((current) => nextModules.find((module) => module.id === current)?.id ?? nextModules[0]?.id ?? 1);
+    setSelectedTestId((current) => nextPracticeTests.find((test) => test.id === current)?.id ?? nextPracticeTests[0]?.id ?? "numerical");
+  }, []);
 
+  const refreshCourseContent = async ({ syncDrafts = true }: { syncDrafts?: boolean } = {}) => {
     await queryClient.invalidateQueries({ queryKey: COURSE_CONTENT_QUERY_KEY });
-    await queryClient.refetchQueries({ queryKey: COURSE_CONTENT_QUERY_KEY });
+    const freshContent = await queryClient.fetchQuery({
+      queryKey: COURSE_CONTENT_QUERY_KEY,
+      queryFn: fetchCourseContent,
+      staleTime: 0,
+    });
+
+    if (syncDrafts && freshContent.modules.length > 0 && freshContent.practiceTests.length > 0) {
+      hydrateCourseDrafts(freshContent.modules, freshContent.practiceTests);
+    }
   };
 
   const refreshUsers = async () => {
@@ -474,7 +484,9 @@ const AdminDashboard = () => {
   };
 
   const syncCourseContentInBackground = () => {
-    void queryClient.invalidateQueries({ queryKey: COURSE_CONTENT_QUERY_KEY });
+    void refreshCourseContent().catch((error) => {
+      console.error("Unable to refresh admin content after save", error);
+    });
   };
 
   const showMutationError = (title: string, error: unknown) => {
@@ -492,6 +504,26 @@ const AdminDashboard = () => {
   ) => `${ownerType}-${questionId}-${slot}`;
 
   const isAssetUploading = (assetKey: string) => Boolean(uploadingAssetKeys[assetKey]);
+
+  const isActionSaving = (actionKey: string) => Boolean(savingActionKeys[actionKey]);
+
+  const setActionSaving = (actionKey: string, saving: boolean) => {
+    setSavingActionKeys((current) => {
+      const next = { ...current };
+
+      if (saving) {
+        next[actionKey] = true;
+      } else {
+        delete next[actionKey];
+      }
+
+      return next;
+    });
+  };
+
+  const getModuleQuestionSaveKey = (questionId: number) => `module-question-${questionId}-save`;
+
+  const getTestQuestionSaveKey = (questionId: number) => `test-question-${questionId}-save`;
 
   const setAssetUploading = (assetKey: string, uploading: boolean) => {
     setUploadingAssetKeys((current) => {
@@ -553,6 +585,22 @@ const AdminDashboard = () => {
           ),
         };
 
+  const persistModuleQuestion = async (question: QuizQuestion) => {
+    if (!question.id) {
+      throw new Error("This question is missing its database id.");
+    }
+
+    await withUploadTimeout(updateModuleQuestionRecord(question.id, question), "Saving question");
+  };
+
+  const persistTestQuestion = async (question: QuizQuestion) => {
+    if (!question.id) {
+      throw new Error("This question is missing its database id.");
+    }
+
+    await withUploadTimeout(updatePracticeTestQuestionRecord(question.id, question), "Saving question");
+  };
+
   const handleLessonAssetUpload = async (
     lessonIndex: number,
     kind: "video" | "poster",
@@ -577,13 +625,15 @@ const AdminDashboard = () => {
     }));
 
     try {
+      const latestLesson = getLatestLesson(lesson.id) ?? lesson;
+      await withUploadTimeout(updateLessonRecord(lesson.id, latestLesson), "Saving lecture");
       validateLessonAssetFile(kind, file);
       const nextPath = await uploadLessonAsset({
         moduleId: selectedModule.id,
         lessonId: lesson.id,
         file,
         kind,
-        previousPath: kind === "video" ? lesson.videoUrl : lesson.posterUrl,
+        previousPath: kind === "video" ? latestLesson.videoUrl : latestLesson.posterUrl,
       });
       updateLesson(lessonIndex, kind === "video" ? { videoUrl: nextPath } : { posterUrl: nextPath });
       setUploadedAssetLabels((current) => ({
@@ -633,6 +683,8 @@ const AdminDashboard = () => {
     }));
 
     try {
+      const latestLesson = getLatestLesson(lesson.id) ?? lesson;
+      await withUploadTimeout(updateLessonRecord(lesson.id, latestLesson), "Saving lecture");
       await removeLessonAsset({
         lessonId: lesson.id,
         kind,
@@ -670,17 +722,8 @@ const AdminDashboard = () => {
       return;
     }
 
-    if (courseDraftsHydratedRef.current && !shouldSyncCourseDraftsRef.current) {
-      return;
-    }
-
-    setModuleDrafts(createModuleDrafts(modules));
-    setTestDrafts(createTestDrafts(practiceTests));
-    setSelectedModuleId((current) => modules.find((module) => module.id === current)?.id ?? modules[0]?.id ?? 1);
-    setSelectedTestId((current) => practiceTests.find((test) => test.id === current)?.id ?? practiceTests[0]?.id ?? "numerical");
-    courseDraftsHydratedRef.current = true;
-    shouldSyncCourseDraftsRef.current = false;
-  }, [modules, practiceTests]);
+    hydrateCourseDrafts(modules, practiceTests);
+  }, [hydrateCourseDrafts, modules, practiceTests]);
 
   useEffect(() => {
     setUserRecords(adminUsers);
@@ -741,9 +784,24 @@ const AdminDashboard = () => {
   };
 
   const updateModuleQuestionOption = (questionIndex: number, optionIndex: number, patch: Partial<QuizOption>) => {
-    const nextOptions = [...(selectedModule?.quiz[questionIndex]?.options ?? [])];
-    nextOptions[optionIndex] = { ...nextOptions[optionIndex], ...patch };
-    updateModuleQuestion(questionIndex, { options: nextOptions });
+    setModuleDrafts((current) =>
+      current.map((module) =>
+        module.id === selectedModule.id
+          ? {
+              ...module,
+              quiz: module.quiz.map((question, index) => {
+                if (index !== questionIndex) {
+                  return question;
+                }
+
+                const nextOptions = [...question.options];
+                nextOptions[optionIndex] = { ...nextOptions[optionIndex], ...patch };
+                return { ...question, options: nextOptions };
+              }),
+            }
+          : module,
+      ),
+    );
   };
 
   const addModuleQuestionOption = (questionIndex: number) => {
@@ -791,9 +849,12 @@ const AdminDashboard = () => {
 
     let nextPath: string | null = null;
     try {
+      const latestBeforeUpload = getLatestModuleQuestion(question.id) ?? question;
+      await persistModuleQuestion(latestBeforeUpload);
+
       const previousPath = optionIndex === undefined
-        ? question.questionImagePath
-        : question.options[optionIndex]?.imagePath ?? null;
+        ? latestBeforeUpload.questionImagePath
+        : latestBeforeUpload.options[optionIndex]?.imagePath ?? null;
       nextPath = await uploadQuestionAsset({
         ownerType: "module",
         ownerId: selectedModule.id,
@@ -805,13 +866,9 @@ const AdminDashboard = () => {
 
       setAssetStatusText((current) => ({ ...current, [assetKey]: "Saving image link to database..." }));
 
-      if (optionIndex === undefined) {
-        await withUploadTimeout(updateModuleQuestionRecord(question.id, { questionImagePath: nextPath }), "Saving image link");
-      } else {
-        const latestQuestion = getLatestModuleQuestion(question.id) ?? question;
-        const nextQuestion = applyQuestionAssetPatch(latestQuestion, nextPath, optionIndex);
-        await withUploadTimeout(updateModuleQuestionRecord(question.id, { options: nextQuestion.options }), "Saving image link");
-      }
+      const latestQuestion = getLatestModuleQuestion(question.id) ?? latestBeforeUpload;
+      const nextQuestion = applyQuestionAssetPatch(latestQuestion, nextPath, optionIndex);
+      await withUploadTimeout(updateModuleQuestionRecord(question.id, nextQuestion), "Saving image link");
 
       const previewUrl = URL.createObjectURL(file);
       patchModuleQuestionById(question.id, (currentQuestion) =>
@@ -861,13 +918,9 @@ const AdminDashboard = () => {
     setAssetStatusText((current) => ({ ...current, [assetKey]: "Removing image link..." }));
 
     try {
-      if (optionIndex === undefined) {
-        await withUploadTimeout(updateModuleQuestionRecord(question.id, { questionImagePath: null }), "Removing image link");
-      } else {
-        const latestQuestion = getLatestModuleQuestion(question.id) ?? question;
-        const nextQuestion = applyQuestionAssetPatch(latestQuestion, null, optionIndex);
-        await withUploadTimeout(updateModuleQuestionRecord(question.id, { options: nextQuestion.options }), "Removing image link");
-      }
+      const latestQuestion = getLatestModuleQuestion(question.id) ?? question;
+      const nextQuestion = applyQuestionAssetPatch(latestQuestion, null, optionIndex);
+      await withUploadTimeout(updateModuleQuestionRecord(question.id, nextQuestion), "Removing image link");
 
       patchModuleQuestionById(question.id, (currentQuestion) => applyQuestionAssetPatch(currentQuestion, null, optionIndex));
       setUploadedAssetLabels((current) => {
@@ -966,23 +1019,27 @@ const AdminDashboard = () => {
     }
   };
 
-  const saveModuleQuestion = async (questionIndex: number) => {
-    const question = selectedModule.quiz[questionIndex];
+  const saveModuleQuestion = async (questionId: number) => {
+    const question = getLatestModuleQuestion(questionId);
 
     if (!question?.id) {
       showMutationError("Unable to update question", new Error("This question is missing its database id."));
       return false;
     }
 
+    const actionKey = getModuleQuestionSaveKey(question.id);
+    setActionSaving(actionKey, true);
+
     try {
-      const latestQuestion = getLatestModuleQuestion(question.id) ?? question;
-      await updateModuleQuestionRecord(question.id, latestQuestion);
+      await persistModuleQuestion(question);
       syncCourseContentInBackground();
       toast({ title: "Question updated", description: "Module quiz changes were saved to Supabase." });
       return true;
     } catch (error) {
       showMutationError("Unable to update question", error);
       return false;
+    } finally {
+      setActionSaving(actionKey, false);
     }
   };
 
@@ -1008,9 +1065,24 @@ const AdminDashboard = () => {
   };
 
   const updateTestQuestionOption = (questionIndex: number, optionIndex: number, patch: Partial<QuizOption>) => {
-    const nextOptions = [...(selectedTest?.testQuestions[questionIndex]?.options ?? [])];
-    nextOptions[optionIndex] = { ...nextOptions[optionIndex], ...patch };
-    updateTestQuestion(questionIndex, { options: nextOptions });
+    setTestDrafts((current) =>
+      current.map((test) =>
+        test.id === selectedTest.id
+          ? {
+              ...test,
+              testQuestions: test.testQuestions.map((question, index) => {
+                if (index !== questionIndex) {
+                  return question;
+                }
+
+                const nextOptions = [...question.options];
+                nextOptions[optionIndex] = { ...nextOptions[optionIndex], ...patch };
+                return { ...question, options: nextOptions };
+              }),
+            }
+          : test,
+      ),
+    );
   };
 
   const addTestQuestionOption = (questionIndex: number) => {
@@ -1058,9 +1130,12 @@ const AdminDashboard = () => {
 
     let nextPath: string | null = null;
     try {
+      const latestBeforeUpload = getLatestTestQuestion(question.id) ?? question;
+      await persistTestQuestion(latestBeforeUpload);
+
       const previousPath = optionIndex === undefined
-        ? question.questionImagePath
-        : question.options[optionIndex]?.imagePath ?? null;
+        ? latestBeforeUpload.questionImagePath
+        : latestBeforeUpload.options[optionIndex]?.imagePath ?? null;
       nextPath = await uploadQuestionAsset({
         ownerType: "test",
         ownerId: selectedTest.dbId,
@@ -1072,13 +1147,9 @@ const AdminDashboard = () => {
 
       setAssetStatusText((current) => ({ ...current, [assetKey]: "Saving image link to database..." }));
 
-      if (optionIndex === undefined) {
-        await withUploadTimeout(updatePracticeTestQuestionRecord(question.id, { questionImagePath: nextPath }), "Saving image link");
-      } else {
-        const latestQuestion = getLatestTestQuestion(question.id) ?? question;
-        const nextQuestion = applyQuestionAssetPatch(latestQuestion, nextPath, optionIndex);
-        await withUploadTimeout(updatePracticeTestQuestionRecord(question.id, { options: nextQuestion.options }), "Saving image link");
-      }
+      const latestQuestion = getLatestTestQuestion(question.id) ?? latestBeforeUpload;
+      const nextQuestion = applyQuestionAssetPatch(latestQuestion, nextPath, optionIndex);
+      await withUploadTimeout(updatePracticeTestQuestionRecord(question.id, nextQuestion), "Saving image link");
 
       const previewUrl = URL.createObjectURL(file);
       patchTestQuestionById(question.id, (currentQuestion) =>
@@ -1128,13 +1199,9 @@ const AdminDashboard = () => {
     setAssetStatusText((current) => ({ ...current, [assetKey]: "Removing image link..." }));
 
     try {
-      if (optionIndex === undefined) {
-        await withUploadTimeout(updatePracticeTestQuestionRecord(question.id, { questionImagePath: null }), "Removing image link");
-      } else {
-        const latestQuestion = getLatestTestQuestion(question.id) ?? question;
-        const nextQuestion = applyQuestionAssetPatch(latestQuestion, null, optionIndex);
-        await withUploadTimeout(updatePracticeTestQuestionRecord(question.id, { options: nextQuestion.options }), "Removing image link");
-      }
+      const latestQuestion = getLatestTestQuestion(question.id) ?? question;
+      const nextQuestion = applyQuestionAssetPatch(latestQuestion, null, optionIndex);
+      await withUploadTimeout(updatePracticeTestQuestionRecord(question.id, nextQuestion), "Removing image link");
 
       patchTestQuestionById(question.id, (currentQuestion) => applyQuestionAssetPatch(currentQuestion, null, optionIndex));
       setUploadedAssetLabels((current) => {
@@ -1213,23 +1280,27 @@ const AdminDashboard = () => {
     }
   };
 
-  const saveTestQuestion = async (questionIndex: number) => {
-    const question = selectedTest.testQuestions[questionIndex];
+  const saveTestQuestion = async (questionId: number) => {
+    const question = getLatestTestQuestion(questionId);
 
     if (!question?.id) {
       showMutationError("Unable to update question", new Error("This question is missing its database id."));
       return false;
     }
 
+    const actionKey = getTestQuestionSaveKey(question.id);
+    setActionSaving(actionKey, true);
+
     try {
-      const latestQuestion = getLatestTestQuestion(question.id) ?? question;
-      await updatePracticeTestQuestionRecord(question.id, latestQuestion);
+      await persistTestQuestion(question);
       syncCourseContentInBackground();
       toast({ title: "Question updated", description: "Timed-test question changes were saved." });
       return true;
     } catch (error) {
       showMutationError("Unable to update question", error);
       return false;
+    } finally {
+      setActionSaving(actionKey, false);
     }
   };
 
@@ -1900,14 +1971,19 @@ const AdminDashboard = () => {
                                 </AlertDialog>
                                 <Button
                                   variant="outline"
+                                  disabled={!question.id || isActionSaving(getModuleQuestionSaveKey(question.id))}
                                   onClick={async () => {
-                                    const saved = await saveModuleQuestion(questionIndex);
+                                    if (!question.id) {
+                                      return;
+                                    }
+
+                                    const saved = await saveModuleQuestion(question.id);
                                     if (saved) {
                                       setEditModuleQuestionId(null);
                                     }
                                   }}
                                 >
-                                  Done
+                                  {question.id && isActionSaving(getModuleQuestionSaveKey(question.id)) ? "Saving..." : "Done"}
                                 </Button>
                               </div>
                             </div>
@@ -2194,14 +2270,19 @@ const AdminDashboard = () => {
                                 </AlertDialog>
                                 <Button
                                   variant="outline"
+                                  disabled={!question.id || isActionSaving(getTestQuestionSaveKey(question.id))}
                                   onClick={async () => {
-                                    const saved = await saveTestQuestion(questionIndex);
+                                    if (!question.id) {
+                                      return;
+                                    }
+
+                                    const saved = await saveTestQuestion(question.id);
                                     if (saved) {
                                       setEditTestQuestionId(null);
                                     }
                                   }}
                                 >
-                                  Done
+                                  {question.id && isActionSaving(getTestQuestionSaveKey(question.id)) ? "Saving..." : "Done"}
                                 </Button>
                               </div>
                             </div>
