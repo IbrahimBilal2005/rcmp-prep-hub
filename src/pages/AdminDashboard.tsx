@@ -590,7 +590,41 @@ const AdminDashboard = () => {
       throw new Error("This question is missing its database id.");
     }
 
-    await withUploadTimeout(updateModuleQuestionRecord(question.id, question), "Saving question");
+    // Validate required fields before saving
+    if (!question.question?.trim()) {
+      throw new Error("Question prompt cannot be empty.");
+    }
+
+    if (!Array.isArray(question.options) || question.options.length < 2) {
+      throw new Error("Question must have at least 2 options.");
+    }
+
+    const hasValidOption = question.options.some((opt) => opt.text?.trim());
+    if (!hasValidOption) {
+      throw new Error("At least one option must have text.");
+    }
+
+    if (!question.explanation?.trim()) {
+      throw new Error("Explanation cannot be empty.");
+    }
+
+    // Ensure correctness is properly set
+    const correctIndexes = getCorrectIndexes(question);
+    if (correctIndexes.length === 0) {
+      throw new Error("At least one correct answer must be marked.");
+    }
+
+    // Create a clean, complete question object for serialization
+    const cleanQuestion: Partial<QuizQuestion> = {
+      question: question.question.trim(),
+      options: question.options,
+      questionImagePath: question.questionImagePath || null,
+      correctIndex: getPrimaryCorrectIndex(question),
+      correctIndexes: correctIndexes,
+      explanation: question.explanation.trim(),
+    };
+
+    await withUploadTimeout(updateModuleQuestionRecord(question.id, cleanQuestion), "Saving question");
   };
 
   const persistTestQuestion = async (question: QuizQuestion) => {
@@ -598,7 +632,41 @@ const AdminDashboard = () => {
       throw new Error("This question is missing its database id.");
     }
 
-    await withUploadTimeout(updatePracticeTestQuestionRecord(question.id, question), "Saving question");
+    // Validate required fields before saving
+    if (!question.question?.trim()) {
+      throw new Error("Question prompt cannot be empty.");
+    }
+
+    if (!Array.isArray(question.options) || question.options.length < 2) {
+      throw new Error("Question must have at least 2 options.");
+    }
+
+    const hasValidOption = question.options.some((opt) => opt.text?.trim());
+    if (!hasValidOption) {
+      throw new Error("At least one option must have text.");
+    }
+
+    if (!question.explanation?.trim()) {
+      throw new Error("Explanation cannot be empty.");
+    }
+
+    // Ensure correctness is properly set
+    const correctIndexes = getCorrectIndexes(question);
+    if (correctIndexes.length === 0) {
+      throw new Error("At least one correct answer must be marked.");
+    }
+
+    // Create a clean, complete question object for serialization
+    const cleanQuestion: Partial<QuizQuestion> = {
+      question: question.question.trim(),
+      options: question.options,
+      questionImagePath: question.questionImagePath || null,
+      correctIndex: getPrimaryCorrectIndex(question),
+      correctIndexes: correctIndexes,
+      explanation: question.explanation.trim(),
+    };
+
+    await withUploadTimeout(updatePracticeTestQuestionRecord(question.id, cleanQuestion), "Saving question");
   };
 
   const handleLessonAssetUpload = async (
@@ -1020,18 +1088,29 @@ const AdminDashboard = () => {
   };
 
   const saveModuleQuestion = async (questionId: number) => {
-    const question = getLatestModuleQuestion(questionId);
+    // Get the latest question from the current state, not from the ref
+    // This ensures we have the most up-to-date data
+    const currentQuestion = moduleDrafts
+      .flatMap((module) => module.quiz)
+      .find((question) => question.id === questionId);
 
-    if (!question?.id) {
+    if (!currentQuestion?.id) {
       showMutationError("Unable to update question", new Error("This question is missing its database id."));
       return false;
     }
 
-    const actionKey = getModuleQuestionSaveKey(question.id);
+    const actionKey = getModuleQuestionSaveKey(currentQuestion.id);
+    
+    // Check if already saving to prevent concurrent saves
+    if (savingActionKeys[actionKey]) {
+      showMutationError("Already saving", new Error("This question is already being saved. Please wait for the current save to complete."));
+      return false;
+    }
+
     setActionSaving(actionKey, true);
 
     try {
-      await persistModuleQuestion(question);
+      await persistModuleQuestion(currentQuestion);
       syncCourseContentInBackground();
       toast({ title: "Question updated", description: "Module quiz changes were saved to Supabase." });
       return true;
@@ -1281,18 +1360,29 @@ const AdminDashboard = () => {
   };
 
   const saveTestQuestion = async (questionId: number) => {
-    const question = getLatestTestQuestion(questionId);
+    // Get the latest question from the current state, not from the ref
+    // This ensures we have the most up-to-date data
+    const currentQuestion = testDrafts
+      .flatMap((test) => test.testQuestions)
+      .find((question) => question.id === questionId);
 
-    if (!question?.id) {
+    if (!currentQuestion?.id) {
       showMutationError("Unable to update question", new Error("This question is missing its database id."));
       return false;
     }
 
-    const actionKey = getTestQuestionSaveKey(question.id);
+    const actionKey = getTestQuestionSaveKey(currentQuestion.id);
+    
+    // Check if already saving to prevent concurrent saves
+    if (savingActionKeys[actionKey]) {
+      showMutationError("Already saving", new Error("This question is already being saved. Please wait for the current save to complete."));
+      return false;
+    }
+
     setActionSaving(actionKey, true);
 
     try {
-      await persistTestQuestion(question);
+      await persistTestQuestion(currentQuestion);
       syncCourseContentInBackground();
       toast({ title: "Question updated", description: "Timed-test question changes were saved." });
       return true;

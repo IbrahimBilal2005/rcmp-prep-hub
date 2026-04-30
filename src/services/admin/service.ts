@@ -307,8 +307,31 @@ export const deleteLesson = async (lessonId: number) => {
 
 export const createModuleQuestion = async (moduleId: number, draft: QuizQuestion) => {
   const client = requireSupabase();
-  const sortOrder = await getNextSortOrder("module_quiz_questions", "module_id", moduleId);
+  
+  // Validate required fields before creating
+  if (!draft.question?.trim()) {
+    throw new Error("Question prompt cannot be empty.");
+  }
+
+  if (!Array.isArray(draft.options) || draft.options.length < 2) {
+    throw new Error("Question must have at least 2 options.");
+  }
+
+  const hasValidOption = draft.options.some((opt) => opt.text?.trim());
+  if (!hasValidOption) {
+    throw new Error("At least one option must have text.");
+  }
+
+  if (!draft.explanation?.trim()) {
+    throw new Error("Explanation cannot be empty.");
+  }
+
   const correctIndexes = getCorrectIndexes(draft);
+  if (correctIndexes.length === 0) {
+    throw new Error("At least one correct answer must be marked.");
+  }
+
+  const sortOrder = await getNextSortOrder("module_quiz_questions", "module_id", moduleId);
   const { error } = await client.from("module_quiz_questions").insert({
     module_id: moduleId,
     question: draft.question.trim() || "Add a new question prompt.",
@@ -329,8 +352,9 @@ export const updateModuleQuestion = async (questionId: number, patch: Partial<Qu
   const client = requireSupabase();
   const updates: Record<string, string | number | number[] | object[] | null> = {};
 
-  if (typeof patch.question === "string") {
-    updates.question = patch.question.trim();
+  // Always update all fields to ensure data consistency
+  if ("question" in patch) {
+    updates.question = typeof patch.question === "string" ? patch.question.trim() : "Add a new question prompt.";
   }
 
   if (Array.isArray(patch.options)) {
@@ -341,14 +365,30 @@ export const updateModuleQuestion = async (questionId: number, patch: Partial<Qu
     updates.question_image_path = patch.questionImagePath?.trim() || null;
   }
 
-  if ("correctIndex" in patch || Array.isArray(patch.correctIndexes)) {
+  if ("correctIndex" in patch || "correctIndexes" in patch || Array.isArray(patch.correctIndexes)) {
     const nextQuestion = getPatchedCorrectnessContext(patch);
     updates.correct_index = getPrimaryCorrectIndex(nextQuestion);
     updates.correct_indexes = getCorrectIndexes(nextQuestion);
   }
 
-  if (typeof patch.explanation === "string") {
-    updates.explanation = patch.explanation.trim();
+  if ("explanation" in patch) {
+    updates.explanation = typeof patch.explanation === "string" ? patch.explanation.trim() : "Add the explanation for this question.";
+  }
+
+  // If no updates were prepared, this is a no-op but should not error
+  if (Object.keys(updates).length === 0) {
+    // Fetch the current record to ensure it exists
+    const { data: existingQuestion, error: fetchError } = await client
+      .from("module_quiz_questions")
+      .select("id")
+      .eq("id", questionId)
+      .maybeSingle();
+
+    if (fetchError || !existingQuestion) {
+      throw new Error("Module question not found or unable to verify.");
+    }
+
+    return; // No updates needed
   }
 
   const { count, error } = await client.from("module_quiz_questions").update(updates, { count: "exact" }).eq("id", questionId);
@@ -434,8 +474,31 @@ export const deletePracticeTest = async (testId: number) => {
 
 export const createPracticeTestQuestion = async (testId: number, draft: QuizQuestion) => {
   const client = requireSupabase();
-  const sortOrder = await getNextSortOrder("practice_test_questions", "practice_test_id", testId);
+  
+  // Validate required fields before creating
+  if (!draft.question?.trim()) {
+    throw new Error("Question prompt cannot be empty.");
+  }
+
+  if (!Array.isArray(draft.options) || draft.options.length < 2) {
+    throw new Error("Question must have at least 2 options.");
+  }
+
+  const hasValidOption = draft.options.some((opt) => opt.text?.trim());
+  if (!hasValidOption) {
+    throw new Error("At least one option must have text.");
+  }
+
+  if (!draft.explanation?.trim()) {
+    throw new Error("Explanation cannot be empty.");
+  }
+
   const correctIndexes = getCorrectIndexes(draft);
+  if (correctIndexes.length === 0) {
+    throw new Error("At least one correct answer must be marked.");
+  }
+
+  const sortOrder = await getNextSortOrder("practice_test_questions", "practice_test_id", testId);
   const { error } = await client.from("practice_test_questions").insert({
     practice_test_id: testId,
     question: draft.question.trim() || "Add a new question prompt.",
@@ -456,8 +519,9 @@ export const updatePracticeTestQuestion = async (questionId: number, patch: Part
   const client = requireSupabase();
   const updates: Record<string, string | number | number[] | object[] | null> = {};
 
-  if (typeof patch.question === "string") {
-    updates.question = patch.question.trim();
+  // Always update all fields to ensure data consistency
+  if ("question" in patch) {
+    updates.question = typeof patch.question === "string" ? patch.question.trim() : "Add a new question prompt.";
   }
 
   if (Array.isArray(patch.options)) {
@@ -468,14 +532,30 @@ export const updatePracticeTestQuestion = async (questionId: number, patch: Part
     updates.question_image_path = patch.questionImagePath?.trim() || null;
   }
 
-  if ("correctIndex" in patch || Array.isArray(patch.correctIndexes)) {
+  if ("correctIndex" in patch || "correctIndexes" in patch || Array.isArray(patch.correctIndexes)) {
     const nextQuestion = getPatchedCorrectnessContext(patch);
     updates.correct_index = getPrimaryCorrectIndex(nextQuestion);
     updates.correct_indexes = getCorrectIndexes(nextQuestion);
   }
 
-  if (typeof patch.explanation === "string") {
-    updates.explanation = patch.explanation.trim();
+  if ("explanation" in patch) {
+    updates.explanation = typeof patch.explanation === "string" ? patch.explanation.trim() : "Add the explanation for this question.";
+  }
+
+  // If no updates were prepared, this is a no-op but should not error
+  if (Object.keys(updates).length === 0) {
+    // Fetch the current record to ensure it exists
+    const { data: existingQuestion, error: fetchError } = await client
+      .from("practice_test_questions")
+      .select("id")
+      .eq("id", questionId)
+      .maybeSingle();
+
+    if (fetchError || !existingQuestion) {
+      throw new Error("Practice test question not found or unable to verify.");
+    }
+
+    return; // No updates needed
   }
 
   const { count, error } = await client.from("practice_test_questions").update(updates, { count: "exact" }).eq("id", questionId);
