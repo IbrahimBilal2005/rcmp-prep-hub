@@ -308,22 +308,22 @@ export const deleteLesson = async (lessonId: number) => {
 export const createModuleQuestion = async (moduleId: number, draft: QuizQuestion) => {
   const client = requireSupabase();
   
-  // Validate required fields before creating
-  if (!draft.question?.trim()) {
-    throw new Error("Question prompt cannot be empty.");
+  // Validate required fields before creating - but allow placeholder text for new questions
+  if (!draft.question?.trim() || draft.question.trim() === "Add a new question prompt.") {
+    throw new Error("Please enter a question prompt before creating.");
   }
 
   if (!Array.isArray(draft.options) || draft.options.length < 2) {
     throw new Error("Question must have at least 2 options.");
   }
 
-  const hasValidOption = draft.options.some((opt) => opt.text?.trim());
+  const hasValidOption = draft.options.some((opt) => opt.text?.trim() && opt.text.trim() !== `Option ${String.fromCharCode(65 + draft.options.indexOf(opt))}`);
   if (!hasValidOption) {
-    throw new Error("At least one option must have text.");
+    throw new Error("At least one option must have custom text (not just the default placeholder).");
   }
 
-  if (!draft.explanation?.trim()) {
-    throw new Error("Explanation cannot be empty.");
+  if (!draft.explanation?.trim() || draft.explanation === "Write the explanation learners should see after answering.") {
+    throw new Error("Please enter an explanation before creating.");
   }
 
   const correctIndexes = getCorrectIndexes(draft);
@@ -475,22 +475,22 @@ export const deletePracticeTest = async (testId: number) => {
 export const createPracticeTestQuestion = async (testId: number, draft: QuizQuestion) => {
   const client = requireSupabase();
   
-  // Validate required fields before creating
-  if (!draft.question?.trim()) {
-    throw new Error("Question prompt cannot be empty.");
+  // Validate required fields before creating - but allow placeholder text for new questions
+  if (!draft.question?.trim() || draft.question.trim() === "Add a new question prompt.") {
+    throw new Error("Please enter a question prompt before creating.");
   }
 
   if (!Array.isArray(draft.options) || draft.options.length < 2) {
     throw new Error("Question must have at least 2 options.");
   }
 
-  const hasValidOption = draft.options.some((opt) => opt.text?.trim());
+  const hasValidOption = draft.options.some((opt) => opt.text?.trim() && opt.text.trim() !== `Option ${String.fromCharCode(65 + draft.options.indexOf(opt))}`);
   if (!hasValidOption) {
-    throw new Error("At least one option must have text.");
+    throw new Error("At least one option must have custom text (not just the default placeholder).");
   }
 
-  if (!draft.explanation?.trim()) {
-    throw new Error("Explanation cannot be empty.");
+  if (!draft.explanation?.trim() || draft.explanation === "Write the explanation learners should see after answering.") {
+    throw new Error("Please enter an explanation before creating.");
   }
 
   const correctIndexes = getCorrectIndexes(draft);
