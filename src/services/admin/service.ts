@@ -109,6 +109,46 @@ const ensureTouchedRow = (row: unknown, action: string) => {
   }
 };
 
+const getQuestionAssetLinkUpdates = (
+  question: QuizQuestion,
+  nextPath: string | null,
+  optionIndex?: number,
+): Record<string, string | object[] | null> => {
+  if (optionIndex === undefined) {
+    return { question_image_path: nextPath?.trim() || null };
+  }
+
+  if (!Array.isArray(question.options) || !question.options[optionIndex]) {
+    throw new Error("Unable to update this option image because the option no longer exists.");
+  }
+
+  return {
+    options: serializeQuestionOptions(
+      question.options.map((option, index) =>
+        index === optionIndex ? { ...option, imagePath: nextPath } : option,
+      ),
+    ),
+  };
+};
+
+const updateQuestionAssetLink = async (
+  table: "module_quiz_questions" | "practice_test_questions",
+  questionId: number,
+  question: QuizQuestion,
+  nextPath: string | null,
+  optionIndex?: number,
+) => {
+  const client = requireSupabase();
+  const updates = getQuestionAssetLinkUpdates(question, nextPath, optionIndex);
+  const { count, error } = await client.from(table).update(updates, { count: "exact" }).eq("id", questionId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  ensureTouchedRow(count, "Question image link update");
+};
+
 const getPatchedCorrectnessContext = (patch: Partial<QuizQuestion>) => {
   if (Array.isArray(patch.options)) {
     return {
@@ -239,7 +279,7 @@ export const deleteModule = async (moduleId: number) => {
 export const createLesson = async (moduleId: number, draft: ModuleLesson) => {
   const client = requireSupabase();
   const sortOrder = await getNextSortOrder("lessons", "module_id", moduleId);
-  const { error } = await client.from("lessons").insert({
+  const { data, error } = await client.from("lessons").insert({
     module_id: moduleId,
     title: draft.title.trim() || "New Lesson",
     chapter_label: draft.chapterLabel.trim() || null,
@@ -250,11 +290,14 @@ export const createLesson = async (moduleId: number, draft: ModuleLesson) => {
     poster_path: draft.posterUrl?.trim() || null,
     is_preview: false,
     is_published: true,
-  });
+  }).select("id").maybeSingle();
 
   if (error) {
     throw new Error(error.message);
   }
+
+  ensureTouchedRow(data, "Lecture create");
+  return data.id as number;
 };
 
 export const updateLesson = async (lessonId: number, patch: Partial<ModuleLesson>) => {
@@ -307,9 +350,8 @@ export const deleteLesson = async (lessonId: number) => {
 
 export const createModuleQuestion = async (moduleId: number, draft: QuizQuestion) => {
   const client = requireSupabase();
-  
-  // Validate required fields before creating - but allow placeholder text for new questions
-  if (!draft.question?.trim() || draft.question.trim() === "Add a new question prompt.") {
+
+  if (!draft.question?.trim()) {
     throw new Error("Please enter a question prompt before creating.");
   }
 
@@ -317,12 +359,12 @@ export const createModuleQuestion = async (moduleId: number, draft: QuizQuestion
     throw new Error("Question must have at least 2 options.");
   }
 
-  const hasValidOption = draft.options.some((opt) => opt.text?.trim() && opt.text.trim() !== `Option ${String.fromCharCode(65 + draft.options.indexOf(opt))}`);
+  const hasValidOption = draft.options.some((opt) => opt.text?.trim() || opt.imagePath?.trim());
   if (!hasValidOption) {
-    throw new Error("At least one option must have custom text (not just the default placeholder).");
+    throw new Error("At least one option must have text or an image.");
   }
 
-  if (!draft.explanation?.trim() || draft.explanation === "Write the explanation learners should see after answering.") {
+  if (!draft.explanation?.trim()) {
     throw new Error("Please enter an explanation before creating.");
   }
 
@@ -332,7 +374,7 @@ export const createModuleQuestion = async (moduleId: number, draft: QuizQuestion
   }
 
   const sortOrder = await getNextSortOrder("module_quiz_questions", "module_id", moduleId);
-  const { error } = await client.from("module_quiz_questions").insert({
+  const { data, error } = await client.from("module_quiz_questions").insert({
     module_id: moduleId,
     question: draft.question.trim() || "Add a new question prompt.",
     question_image_path: draft.questionImagePath?.trim() || null,
@@ -341,11 +383,14 @@ export const createModuleQuestion = async (moduleId: number, draft: QuizQuestion
     correct_indexes: correctIndexes,
     explanation: draft.explanation.trim() || "Add the explanation for this question.",
     sort_order: sortOrder,
-  });
+  }).select("id").maybeSingle();
 
   if (error) {
     throw new Error(error.message);
   }
+
+  ensureTouchedRow(data, "Module question create");
+  return data.id as number;
 };
 
 export const updateModuleQuestion = async (questionId: number, patch: Partial<QuizQuestion>) => {
@@ -399,6 +444,13 @@ export const updateModuleQuestion = async (questionId: number, patch: Partial<Qu
 
   ensureTouchedRow(count, "Module question update");
 };
+
+export const updateModuleQuestionAssetLink = async (
+  questionId: number,
+  question: QuizQuestion,
+  nextPath: string | null,
+  optionIndex?: number,
+) => updateQuestionAssetLink("module_quiz_questions", questionId, question, nextPath, optionIndex);
 
 export const deleteModuleQuestion = async (questionId: number) => {
   const client = requireSupabase();
@@ -474,9 +526,8 @@ export const deletePracticeTest = async (testId: number) => {
 
 export const createPracticeTestQuestion = async (testId: number, draft: QuizQuestion) => {
   const client = requireSupabase();
-  
-  // Validate required fields before creating - but allow placeholder text for new questions
-  if (!draft.question?.trim() || draft.question.trim() === "Add a new question prompt.") {
+
+  if (!draft.question?.trim()) {
     throw new Error("Please enter a question prompt before creating.");
   }
 
@@ -484,12 +535,12 @@ export const createPracticeTestQuestion = async (testId: number, draft: QuizQues
     throw new Error("Question must have at least 2 options.");
   }
 
-  const hasValidOption = draft.options.some((opt) => opt.text?.trim() && opt.text.trim() !== `Option ${String.fromCharCode(65 + draft.options.indexOf(opt))}`);
+  const hasValidOption = draft.options.some((opt) => opt.text?.trim() || opt.imagePath?.trim());
   if (!hasValidOption) {
-    throw new Error("At least one option must have custom text (not just the default placeholder).");
+    throw new Error("At least one option must have text or an image.");
   }
 
-  if (!draft.explanation?.trim() || draft.explanation === "Write the explanation learners should see after answering.") {
+  if (!draft.explanation?.trim()) {
     throw new Error("Please enter an explanation before creating.");
   }
 
@@ -499,7 +550,7 @@ export const createPracticeTestQuestion = async (testId: number, draft: QuizQues
   }
 
   const sortOrder = await getNextSortOrder("practice_test_questions", "practice_test_id", testId);
-  const { error } = await client.from("practice_test_questions").insert({
+  const { data, error } = await client.from("practice_test_questions").insert({
     practice_test_id: testId,
     question: draft.question.trim() || "Add a new question prompt.",
     question_image_path: draft.questionImagePath?.trim() || null,
@@ -508,11 +559,14 @@ export const createPracticeTestQuestion = async (testId: number, draft: QuizQues
     correct_indexes: correctIndexes,
     explanation: draft.explanation.trim() || "Add the explanation for this question.",
     sort_order: sortOrder,
-  });
+  }).select("id").maybeSingle();
 
   if (error) {
     throw new Error(error.message);
   }
+
+  ensureTouchedRow(data, "Practice test question create");
+  return data.id as number;
 };
 
 export const updatePracticeTestQuestion = async (questionId: number, patch: Partial<QuizQuestion>) => {
@@ -566,6 +620,13 @@ export const updatePracticeTestQuestion = async (questionId: number, patch: Part
 
   ensureTouchedRow(count, "Practice test question update");
 };
+
+export const updatePracticeTestQuestionAssetLink = async (
+  questionId: number,
+  question: QuizQuestion,
+  nextPath: string | null,
+  optionIndex?: number,
+) => updateQuestionAssetLink("practice_test_questions", questionId, question, nextPath, optionIndex);
 
 export const deletePracticeTestQuestion = async (questionId: number) => {
   const client = requireSupabase();

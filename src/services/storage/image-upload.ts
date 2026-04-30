@@ -79,13 +79,13 @@ export const optimizeImageForUpload = async (file: File) => {
   });
 };
 
-export const withUploadTimeout = async <T>(operation: Promise<T>, label = "Upload") => {
+export const withUploadTimeout = async <T>(operation: Promise<T>, label = "Upload", timeoutMs = IMAGE_UPLOAD_TIMEOUT_MS) => {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
   const timeout = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => {
       reject(new Error(`${label} timed out. Check your connection, try a smaller image, or try again in a moment.`));
-    }, IMAGE_UPLOAD_TIMEOUT_MS);
+    }, timeoutMs);
   });
 
   try {

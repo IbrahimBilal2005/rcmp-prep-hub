@@ -1,11 +1,12 @@
 import { supabase } from "@/services/supabase/client";
-import { optimizeImageForUpload, withUploadTimeout } from "@/services/storage/image-upload";
+import { withUploadTimeout } from "@/services/storage/image-upload";
 
 const QUESTION_IMAGE_BUCKET = "question-images";
 const MAX_QUESTION_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_QUESTION_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 const SIGNED_URL_CACHE_BUFFER_MS = 60_000;
+const SIGNED_URL_TIMEOUT_MS = 10_000;
 
 const sanitizeFileName = (name: string) =>
   name
@@ -49,6 +50,7 @@ export const resolveQuestionAssetUrl = async (path: string | null) => {
   const { data, error } = await withUploadTimeout(
     supabase.storage.from(QUESTION_IMAGE_BUCKET).createSignedUrl(path, SIGNED_URL_TTL_SECONDS),
     "Question image load",
+    SIGNED_URL_TIMEOUT_MS,
   );
 
   if (error) {
@@ -70,25 +72,23 @@ export const uploadQuestionAsset = async ({
   questionId,
   slot,
   file,
-  previousPath,
 }: {
   ownerType: "module" | "test";
   ownerId: number;
   questionId: number;
   slot: string;
   file: File;
-  previousPath?: string | null;
 }) => {
   if (!supabase) {
     throw new Error("Supabase client is not initialized.");
   }
 
   validateQuestionImageFile(file);
-  const uploadFile = await withUploadTimeout(optimizeImageForUpload(file), "Image optimization");
-  validateQuestionImageFile(uploadFile);
+  const uploadFile = file;
 
   const fileName = sanitizeFileName(uploadFile.name || `question-image-${Date.now()}`);
-  const storagePath = `${ownerType}-${ownerId}/question-${questionId}/${slot}/${Date.now()}-${fileName}`;
+  const uniqueId = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`;
+  const storagePath = `${ownerType}-${ownerId}/question-${questionId}/${slot}/${uniqueId}-${fileName}`;
 
   const { error: uploadError } = await withUploadTimeout(supabase.storage.from(QUESTION_IMAGE_BUCKET).upload(storagePath, uploadFile, {
     upsert: true,
@@ -97,15 +97,6 @@ export const uploadQuestionAsset = async ({
 
   if (uploadError) {
     throw new Error(uploadError.message);
-  }
-
-  if (previousPath && !isAbsoluteUrl(previousPath) && previousPath !== storagePath) {
-    signedUrlCache.delete(previousPath);
-    const { error: removeError } = await supabase.storage.from(QUESTION_IMAGE_BUCKET).remove([previousPath]);
-
-    if (removeError) {
-      console.error("Unable to remove previous question image", removeError);
-    }
   }
 
   signedUrlCache.delete(storagePath);

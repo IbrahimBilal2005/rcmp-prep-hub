@@ -1,5 +1,5 @@
 import { supabase } from "@/services/supabase/client";
-import { optimizeImageForUpload, withUploadTimeout } from "@/services/storage/image-upload";
+import { withUploadTimeout } from "@/services/storage/image-upload";
 
 export type LessonAssetKind = "video" | "poster";
 
@@ -9,6 +9,7 @@ const MAX_VIDEO_SIZE_BYTES = 500 * 1024 * 1024;
 const MAX_POSTER_SIZE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime"]);
 const ALLOWED_POSTER_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+const SIGNED_URL_TIMEOUT_MS = 10_000;
 
 const getBucketName = (kind: LessonAssetKind) =>
   kind === "video" ? LESSON_VIDEO_BUCKET : LESSON_POSTER_BUCKET;
@@ -60,6 +61,7 @@ export const resolveLessonAssetUrl = async (kind: LessonAssetKind, path: string 
   const { data, error } = await withUploadTimeout(
     supabase.storage.from(getBucketName(kind)).createSignedUrl(path, 60 * 60),
     `${kind === "video" ? "Video" : "Poster"} load`,
+    SIGNED_URL_TIMEOUT_MS,
   );
 
   if (error) {
@@ -88,12 +90,12 @@ export const uploadLessonAsset = async ({
   }
 
   validateLessonAssetFile(kind, file);
-  const uploadFile = kind === "poster" ? await withUploadTimeout(optimizeImageForUpload(file), "Poster optimization") : file;
-  validateLessonAssetFile(kind, uploadFile);
+  const uploadFile = file;
 
   const bucket = getBucketName(kind);
   const fileName = sanitizeFileName(uploadFile.name || `${kind}-${Date.now()}`);
-  const storagePath = `module-${moduleId}/lesson-${lessonId}/${Date.now()}-${fileName}`;
+  const uniqueId = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`;
+  const storagePath = `module-${moduleId}/lesson-${lessonId}/${uniqueId}-${fileName}`;
 
   const uploadOperation = supabase.storage.from(bucket).upload(storagePath, uploadFile, {
     upsert: true,
@@ -123,11 +125,11 @@ export const uploadLessonAsset = async ({
   }
 
   if (previousPath && !isAbsoluteUrl(previousPath) && previousPath !== storagePath) {
-    const { error: removeError } = await supabase.storage.from(bucket).remove([previousPath]);
-
-    if (removeError) {
-      console.error(`Unable to remove previous ${kind} asset`, removeError);
-    }
+    void supabase.storage.from(bucket).remove([previousPath]).then(({ error: removeError }) => {
+      if (removeError) {
+        console.error(`Unable to remove previous ${kind} asset`, removeError);
+      }
+    });
   }
 
   return storagePath;
