@@ -17,14 +17,15 @@ const LessonView = () => {
   const { id, lessonIndex } = useParams();
   const moduleId = Number(id);
   const lessonNumber = Number(lessonIndex);
-  const mod = modules.find((entry) => entry.id === moduleId);
+  const moduleIndex = modules.findIndex((entry) => entry.id === moduleId);
+  const mod = moduleIndex >= 0 ? modules[moduleIndex] : undefined;
   const [completedLessons, setCompletedLessons] = useState<number[]>([]);
   const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string | null>(null);
   const [resolvedPosterUrl, setResolvedPosterUrl] = useState<string | null>(null);
   const isValidLessonIndex = Boolean(mod) && Number.isInteger(lessonNumber) && lessonNumber >= 0 && lessonNumber < mod.lessons.length;
   const lesson = mod && isValidLessonIndex ? mod.lessons[lessonNumber] : null;
-  const moduleUnlocked = canAccessModule(moduleId);
-  const lessonUnlocked = lesson ? moduleUnlocked && isPreviewLessonUnlocked(moduleId, lessonNumber) : false;
+  const moduleUnlocked = canAccessModule(moduleId, moduleIndex);
+  const lessonUnlocked = lesson ? moduleUnlocked && isPreviewLessonUnlocked(moduleId, lessonNumber, moduleIndex) : false;
 
   useEffect(() => {
     const progress = getModuleProgress(moduleId);
@@ -110,7 +111,7 @@ const LessonView = () => {
 
   const previousLessonIndex = lessonNumber > 0 ? lessonNumber - 1 : null;
   const nextLessonIndex = lessonNumber < mod.lessons.length - 1 ? lessonNumber + 1 : null;
-  const nextLessonUnlocked = nextLessonIndex !== null && isPreviewLessonUnlocked(moduleId, nextLessonIndex);
+  const nextLessonUnlocked = nextLessonIndex !== null && isPreviewLessonUnlocked(moduleId, nextLessonIndex, moduleIndex);
   const completedCount = completedLessons.length;
 
   const toggleLessonComplete = (index: number) => {
@@ -158,7 +159,7 @@ const LessonView = () => {
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0">
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-accent">
-                      Module {moduleId} · {lesson.chapterLabel}
+                      Module {moduleIndex + 1} · {lesson.chapterLabel}
                     </p>
                     <h1 className="mt-3 font-heading text-3xl font-bold leading-tight text-foreground sm:text-[2.15rem]">
                       {lesson.title}
@@ -268,7 +269,7 @@ const LessonView = () => {
 
               <div className="space-y-3 max-h-[24rem] overflow-y-auto pr-1">
                 {mod.lessons.map((moduleLesson, index) => {
-                  const unlocked = isPreviewLessonUnlocked(moduleId, index);
+                  const unlocked = isPreviewLessonUnlocked(moduleId, index, moduleIndex);
                   const active = index === lessonNumber;
                   const completed = completedLessons.includes(index);
 

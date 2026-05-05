@@ -246,7 +246,7 @@ export const createModule = async (draft: { title: string; description: string }
 
 export const updateModule = async (moduleId: number, patch: Partial<ModuleInfo>) => {
   const client = requireSupabase();
-  const updates: Record<string, string> = {};
+  const updates: Record<string, string | number> = {};
 
   if (typeof patch.title === "string") {
     updates.title = patch.title.trim();
@@ -256,6 +256,10 @@ export const updateModule = async (moduleId: number, patch: Partial<ModuleInfo>)
     updates.description = patch.description.trim();
   }
 
+  if (typeof patch.sortOrder === "number") {
+    updates.sort_order = patch.sortOrder;
+  }
+
   const { data, error } = await client.from("modules").update(updates).eq("id", moduleId).select("id").maybeSingle();
 
   if (error) {
@@ -263,6 +267,26 @@ export const updateModule = async (moduleId: number, patch: Partial<ModuleInfo>)
   }
 
   ensureTouchedRow(data, "Module update");
+};
+
+export const updateModuleOrder = async (moduleIds: number[]) => {
+  const client = requireSupabase();
+
+  const updates = moduleIds.map((moduleId, index) =>
+    client
+      .from("modules")
+      .update({ sort_order: index })
+      .eq("id", moduleId)
+      .select("id")
+      .maybeSingle(),
+  );
+
+  const results = await Promise.all(updates);
+  const failed = results.find(({ data, error }) => error || !data);
+
+  if (failed) {
+    throw new Error(failed.error?.message || "Module order update did not update every module.");
+  }
 };
 
 export const deleteModule = async (moduleId: number) => {

@@ -30,6 +30,7 @@ export interface ModuleLesson {
 export interface ModuleInfo {
   id: number;
   slug?: string;
+  sortOrder?: number;
   icon: LucideIcon;
   title: string;
   description: string;

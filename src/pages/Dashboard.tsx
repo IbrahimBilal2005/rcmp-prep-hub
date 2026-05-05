@@ -19,7 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { initializeAuthSession } from "@/lib/auth";
-import { FREE_PREVIEW_MODULE_ID, FREE_PREVIEW_TEST_ID, canAccessModule, canAccessTest, isFreePreviewMode } from "@/lib/access";
+import { FREE_PREVIEW_TEST_ID, canAccessModule, canAccessTest, isFreePreviewMode } from "@/lib/access";
 import { getAllModuleProgress, isModuleFullyCompleted } from "@/lib/moduleProgressStorage";
 import {
   getBestPracticeAttempt,
@@ -150,9 +150,11 @@ const Dashboard = () => {
   }
 
   const moduleProgress = getAllModuleProgress();
-  const accessibleModules = modules.filter((mod) => canAccessModule(mod.id));
+  const getModuleDisplayNumber = (moduleId: number) =>
+    modules.findIndex((module) => module.id === moduleId) + 1 || moduleId;
+  const accessibleModules = modules.filter((mod, index) => canAccessModule(mod.id, index));
   const accessibleTests = practiceTests.filter((test) => canAccessTest(test.id));
-  const previewModule = modules.find((mod) => mod.id === FREE_PREVIEW_MODULE_ID) ?? modules[0];
+  const previewModule = modules[0];
   const previewTest = practiceTests.find((test) => test.id === FREE_PREVIEW_TEST_ID) ?? practiceTests[0];
   const firstAccessibleModule = accessibleModules[0] ?? previewModule;
   const firstAccessibleTest = accessibleTests[0] ?? previewTest;
@@ -315,7 +317,7 @@ const Dashboard = () => {
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-2xl bg-primary-foreground/8 px-4 py-4 border border-primary-foreground/10">
                 <p className="text-primary-foreground/55 mb-1">Current module</p>
-                <p className="font-semibold text-primary-foreground">Module {nextModule.id}</p>
+                <p className="font-semibold text-primary-foreground">Module {getModuleDisplayNumber(nextModule.id)}</p>
                 <p className="text-primary-foreground/65 text-xs mt-1">
                   {nextModuleProgress?.quizCompleted
                     ? "Quiz finished"
@@ -362,7 +364,7 @@ const Dashboard = () => {
             >
               <div className="grid gap-4 md:grid-cols-2">
                 {modules.map((mod, index) => {
-                  const accessible = canAccessModule(mod.id);
+                  const accessible = canAccessModule(mod.id, index);
                   const progress = moduleProgress[mod.id];
                   const completedLessons = progress?.completedLessons.length ?? 0;
                   const isComplete = isModuleFullyCompleted(progress, mod.lessons.length);
@@ -404,7 +406,7 @@ const Dashboard = () => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
-                          <p className={`text-xs font-semibold ${isComplete ? "text-emerald-700" : "text-accent"}`}>Module {mod.id}</p>
+                          <p className={`text-xs font-semibold ${isComplete ? "text-emerald-700" : "text-accent"}`}>Module {index + 1}</p>
                           {isComplete && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
                               <CheckCircle2 className="h-3 w-3" /> Complete

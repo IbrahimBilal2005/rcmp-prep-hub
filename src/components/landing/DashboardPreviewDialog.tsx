@@ -23,6 +23,7 @@ const DashboardPreviewDialog = ({ children }: DashboardPreviewDialogProps) => {
   const modules = resolvedCourseContent.modules;
   const practiceTests = resolvedCourseContent.practiceTests;
   const featuredModule = modules[1];
+  const featuredModuleNumber = featuredModule ? modules.findIndex((module) => module.id === featuredModule.id) + 1 : null;
   const modulePreviewLessons = featuredModule?.lessons.slice(0, 3) ?? [];
   const featuredTest = practiceTests[0];
   const reviewTest = practiceTests[1];
@@ -90,7 +91,7 @@ const DashboardPreviewDialog = ({ children }: DashboardPreviewDialogProps) => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className={`text-xs font-semibold ${index === 0 ? "text-emerald-700" : "text-accent"}`}>Module {module.id}</p>
+                        <p className={`text-xs font-semibold ${index === 0 ? "text-emerald-700" : "text-accent"}`}>Module {index + 1}</p>
                         {index === 2 && (
                           <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-red-600">
                             Locked
@@ -173,7 +174,7 @@ const DashboardPreviewDialog = ({ children }: DashboardPreviewDialogProps) => {
                     {featuredModule && <featuredModule.icon className="h-7 w-7 text-accent-foreground" />}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-accent">Module {featuredModule?.id}</p>
+                    <p className="text-sm font-semibold text-accent">Module {featuredModuleNumber}</p>
                     <h3 className="font-heading text-2xl font-bold text-foreground">{featuredModule?.title}</h3>
                   </div>
                 </div>

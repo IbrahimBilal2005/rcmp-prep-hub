@@ -17,7 +17,6 @@ import {
 import { Button } from "@/components/ui/button";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import {
-  FREE_PREVIEW_MODULE_ID,
   canAccessModule,
   canViewDetailedAnswerFeedback,
   hasFullAccess,
@@ -33,9 +32,11 @@ import { persistModuleProgress, persistModuleQuizAttempt } from "@/services/prog
 const LockedMask = ({
   title,
   body,
+  previewModuleId,
 }: {
   title: string;
   body: string;
+  previewModuleId: number;
 }) => (
   <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] bg-background/45 backdrop-blur-[6px]">
     <div className="mx-4 max-w-md rounded-3xl border border-border/70 bg-background/92 p-6 text-center shadow-2xl">
@@ -48,7 +49,7 @@ const LockedMask = ({
         <a href="/signup?step=plan">
           <Button variant="locked">Unlock Full Access</Button>
         </a>
-        <Link to={`/module/${FREE_PREVIEW_MODULE_ID}`}>
+        <Link to={`/module/${previewModuleId}`}>
           <Button variant="outline">Open Available Module</Button>
         </Link>
       </div>
@@ -63,7 +64,9 @@ const ModuleDetail = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const moduleId = Number(id);
-  const mod = modules.find((m) => m.id === moduleId);
+  const moduleIndex = modules.findIndex((m) => m.id === moduleId);
+  const mod = moduleIndex >= 0 ? modules[moduleIndex] : undefined;
+  const previewModuleId = modules[0]?.id ?? 1;
 
   const [quizStarted, setQuizStarted] = useState(false);
   const [currentQ, setCurrentQ] = useState(0);
@@ -75,7 +78,7 @@ const ModuleDetail = () => {
   const [selectedLessonIndex, setSelectedLessonIndex] = useState<number>(0);
   const [completedLessons, setCompletedLessons] = useState<number[]>([]);
 
-  const lockedModule = mod ? !canAccessModule(moduleId) : false;
+  const lockedModule = mod ? !canAccessModule(moduleId, moduleIndex) : false;
   const isPremium = hasFullAccess();
   const quiz = mod?.quiz ?? [];
   const currentQuestion = quiz[currentQ];
@@ -127,8 +130,8 @@ const ModuleDetail = () => {
   const Icon = mod.icon;
   const totalLessonMinutes = mod.lessons.reduce((a, l) => a + parseInt(l.duration, 10), 0);
   const allLessonsCompleted = completedLessons.length === mod.lessons.length;
-  const lessonUnlocked = isPreviewLessonUnlocked(moduleId, selectedLessonIndex);
-  const questionUnlocked = isPreviewModuleQuizQuestionUnlocked(moduleId, currentQ);
+  const lessonUnlocked = isPreviewLessonUnlocked(moduleId, selectedLessonIndex, moduleIndex);
+  const questionUnlocked = isPreviewModuleQuizQuestionUnlocked(moduleId, currentQ, moduleIndex);
   const totalProgressSteps = mod.lessons.length + 1;
   const storedProgress = getModuleProgress(moduleId);
   const fullyCompleted = isModuleFullyCompleted(storedProgress, mod.lessons.length);
@@ -137,7 +140,7 @@ const ModuleDetail = () => {
   );
 
   const selectLesson = (index: number) => {
-    if (!isPreviewLessonUnlocked(moduleId, index)) {
+    if (!isPreviewLessonUnlocked(moduleId, index, moduleIndex)) {
       return;
     }
 
@@ -152,7 +155,7 @@ const ModuleDetail = () => {
   };
 
   const toggleLessonComplete = (index: number) => {
-    if (!isPreviewLessonUnlocked(moduleId, index) || lockedModule) {
+    if (!isPreviewLessonUnlocked(moduleId, index, moduleIndex) || lockedModule) {
       return;
     }
 
@@ -272,7 +275,7 @@ const ModuleDetail = () => {
               <Icon className="h-7 w-7 text-accent-foreground" />
             </div>
             <div>
-              <p className="text-sm text-accent font-semibold">Module {moduleId}</p>
+              <p className="text-sm text-accent font-semibold">Module {moduleIndex + 1}</p>
               <h1 className="text-2xl sm:text-3xl font-heading font-bold text-foreground">{mod.title}</h1>
             </div>
           </div>
@@ -298,7 +301,7 @@ const ModuleDetail = () => {
           {mod.lessons.map((lesson, i) => {
             const isSelected = selectedLessonIndex === i;
             const isCompleted = completedLessons.includes(i);
-            const isUnlocked = isPreviewLessonUnlocked(moduleId, i) && !lockedModule;
+            const isUnlocked = isPreviewLessonUnlocked(moduleId, i, moduleIndex) && !lockedModule;
 
             return (
               <div
@@ -343,6 +346,7 @@ const ModuleDetail = () => {
             <LockedMask
               title="Locked module"
               body="This module is visible so users can inspect the real layout, but the content stays locked until full access is unlocked."
+              previewModuleId={previewModuleId}
             />
           )}
 
@@ -412,6 +416,7 @@ const ModuleDetail = () => {
                     body={lockedModule
                       ? "This module quiz stays locked until full access is unlocked."
                       : "Only part of this quiz is available on the free plan. Unlock premium to access the remaining questions and detailed answer review."}
+                    previewModuleId={previewModuleId}
                   />
                 )}
 

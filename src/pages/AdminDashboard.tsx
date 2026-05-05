@@ -2,6 +2,8 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import {
+  ArrowDown,
+  ArrowUp,
   BookOpen,
   Crown,
   CheckCircle2,
@@ -59,6 +61,7 @@ import {
   updateAdminUser,
   updateLesson as updateLessonRecord,
   updateModule as updateModuleRecord,
+  updateModuleOrder,
   updateModuleQuestion as updateModuleQuestionRecord,
   updateModuleQuestionAssetLink,
   updatePracticeTest as updatePracticeTestRecord,
@@ -839,6 +842,7 @@ const AdminDashboard = () => {
   }
 
   const selectedModule = moduleDrafts.find((module) => module.id === selectedModuleId) ?? moduleDrafts[0];
+  const selectedModuleDisplayIndex = moduleDrafts.findIndex((module) => module.id === selectedModule.id);
 
   const selectedTest = testDrafts.find((test) => test.id === selectedTestId) ?? testDrafts[0];
 
@@ -1000,6 +1004,36 @@ const AdminDashboard = () => {
     } finally {
       setAssetUploading(assetKey, false);
       setAssetUploading(assetGroupKey, false);
+    }
+  };
+
+  const moveModule = async (moduleId: number, direction: -1 | 1) => {
+    const currentIndex = moduleDrafts.findIndex((module) => module.id === moduleId);
+    const nextIndex = currentIndex + direction;
+
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= moduleDrafts.length) {
+      return;
+    }
+
+    const previousModules = moduleDrafts;
+    const reorderedModules = [...moduleDrafts];
+    const [movedModule] = reorderedModules.splice(currentIndex, 1);
+    reorderedModules.splice(nextIndex, 0, movedModule);
+    const nextModules = reorderedModules.map((module, index) => ({ ...module, sortOrder: index }));
+
+    setModuleDrafts(nextModules);
+    setSelectedModuleId(moduleId);
+    setActionSaving("module-order", true);
+
+    try {
+      await updateModuleOrder(nextModules.map((module) => module.id));
+      markCourseContentStale();
+      toast({ title: "Module order updated", description: "The dashboard module sequence was saved." });
+    } catch (error) {
+      setModuleDrafts(previousModules);
+      showMutationError("Unable to update module order", error);
+    } finally {
+      setActionSaving("module-order", false);
     }
   };
 
@@ -1702,25 +1736,61 @@ const AdminDashboard = () => {
               </div>
 
               <div className="space-y-3">
-                {moduleDrafts.map((module) => (
-                  <button
-                    key={module.id}
-                    type="button"
-                    onClick={() => setSelectedModuleId(module.id)}
-                    className={cn(
-                      "w-full rounded-2xl border px-4 py-4 text-left transition-all",
-                      module.id === selectedModule.id ? "border-accent/35 bg-accent/5 shadow-sm" : "border-border/60 bg-card hover:border-accent/20",
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-semibold text-accent">Module {module.id}</p>
-                        <p className="mt-1 font-semibold text-foreground">{module.title}</p>
+                {moduleDrafts.map((module, index) => {
+                  const orderSaving = isActionSaving("module-order");
+
+                  return (
+                    <div
+                      key={module.id}
+                      className={cn(
+                        "grid grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-2xl border px-3 py-3 transition-all",
+                        module.id === selectedModule.id
+                          ? "border-accent/35 bg-accent/5 shadow-sm"
+                          : "border-border/60 bg-card hover:border-accent/20",
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setSelectedModuleId(module.id)}
+                        className="min-w-0 text-left"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-accent">Module {index + 1}</p>
+                            <p className="mt-1 truncate font-semibold text-foreground">{module.title}</p>
+                            <p className="mt-1 text-[11px] text-muted-foreground">Database id {module.id}</p>
+                          </div>
+                          <span className="shrink-0 text-xs text-muted-foreground">{module.lessons.length} lessons</span>
+                        </div>
+                      </button>
+
+                      <div className="flex flex-col gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void moveModule(module.id, -1)}
+                          disabled={index === 0 || orderSaving}
+                          aria-label={`Move ${module.title} up`}
+                          className="h-8 w-8 p-0"
+                        >
+                          <ArrowUp className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void moveModule(module.id, 1)}
+                          disabled={index === moduleDrafts.length - 1 || orderSaving}
+                          aria-label={`Move ${module.title} down`}
+                          className="h-8 w-8 p-0"
+                        >
+                          <ArrowDown className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <span className="text-xs text-muted-foreground">{module.lessons.length} lessons</span>
                     </div>
-                  </button>
-                ))}
+                  );
+                })}
               </div>
             </aside>
 
@@ -1730,6 +1800,9 @@ const AdminDashboard = () => {
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-accent">Module settings</p>
                     <h2 className="mt-2 font-heading text-2xl font-semibold text-foreground">{selectedModule.title}</h2>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Displayed as Module {selectedModuleDisplayIndex + 1}; database id {selectedModule.id}.
+                    </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Dialog open={editModuleOpen} onOpenChange={setEditModuleOpen}>

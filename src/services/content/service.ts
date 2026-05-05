@@ -132,6 +132,7 @@ const mapLesson = (lesson: LessonRow, index: number): ModuleLesson => ({
 const mapModule = async (module: ModuleRow): Promise<ModuleInfo> => ({
   id: module.id,
   slug: module.slug,
+  sortOrder: module.sort_order,
   icon: moduleIconBySlug[module.slug] ?? defaultModuleIcon,
   title: module.title,
   description: module.description,
