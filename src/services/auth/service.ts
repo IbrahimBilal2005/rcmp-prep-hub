@@ -162,6 +162,12 @@ const getActiveSupabaseUser = async () => {
   return null;
 };
 
+const hydrateProgressInBackground = (userId: string) => {
+  void hydratePersistedProgress(userId).catch((error) => {
+    console.error("Failed to hydrate persisted progress after auth", error);
+  });
+};
+
 export const getAuthSession = () => getStoredAuthSession();
 
 export const saveAuthSession = (session: AuthSession) => {
@@ -317,6 +323,6 @@ export const signInWithEmail = async ({ email, password }: AccountCredentials) =
     throw new Error("This account is currently suspended. Contact support if you need access restored.");
   }
 
-  await hydratePersistedProgress(session.id);
+  hydrateProgressInBackground(session.id);
   return session;
 };
