@@ -32,7 +32,7 @@ const HeroSection = () => {
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
               <span className="eyebrow mb-8">
                 <ShieldCheck className="h-3.5 w-3.5 text-accent" />
-                RCMP aptitude test prep
+                RCMP Online Entrance Assessment Prep
               </span>
             </motion.div>
 
@@ -53,7 +53,7 @@ const HeroSection = () => {
               className="mt-8 max-w-xl"
             >
               <p className="section-copy text-[1.04rem]">
-                A focused RCMP-style study environment with guided modules, timed practice, and review tools designed to keep your next move clear without clutter or noise.
+                RCMP Online Entrance Assessment practice with timed simulations, memory training, spatial reasoning, and section-by-section preparation.
               </p>
             </motion.div>
 

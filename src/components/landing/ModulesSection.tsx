@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { BookOpen, Brain, Calculator, FileText, Languages, MoveUpRight, Shapes, Users } from "lucide-react";
 
 const modules = [
-  { icon: BookOpen, title: "Understanding the Test", desc: "Learn the test format, scoring, and strategic approach to maximize your results." },
+  { icon: BookOpen, title: "RCMP Entrance Assessment Overview", desc: "Learn the test format, scoring, and strategic approach to maximize your results." },
   { icon: Calculator, title: "Numerical Skills", desc: "Master arithmetic, data interpretation, and number series with targeted practice." },
   { icon: Brain, title: "Memory & Observation", desc: "Develop techniques to recall details from images, text passages, and scenarios." },
   { icon: Shapes, title: "Spatial Reasoning", desc: "Practice pattern recognition, shape rotation, and visual-spatial problem solving." },
@@ -23,7 +23,7 @@ const ModulesSection = () => {
             </h2>
           </div>
           <p className="section-copy lg:ml-auto lg:max-w-sm">
-            Seven structured modules covering every aspect of the RCMP aptitude test, from numerical skills to professional judgment.
+            Seven structured modules covering every aspect of the RCMP Entrance Assessment, from numerical skills to professional judgment.
           </p>
         </div>
 
