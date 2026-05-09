@@ -118,7 +118,7 @@ const PricingSection = () => {
 
                   <Link to="/signup?mode=signup">
                     <Button variant={isPremium ? "hero" : "outline"} size="xl" className="w-full">
-                      Create Account To Choose
+                      Start Practicing
                       <ArrowRight className="h-5 w-5" />
                     </Button>
                   </Link>

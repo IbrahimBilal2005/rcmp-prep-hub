@@ -49,7 +49,7 @@ const Navbar = () => {
           </Link>
           <Link to="/signup?mode=signup">
             <Button variant="hero" size="sm">
-              Create Account
+              Start Practicing
               <MoveRight className="h-4 w-4" />
             </Button>
           </Link>
@@ -91,7 +91,7 @@ const Navbar = () => {
           </Link>
           <Link to="/signup?mode=signup" onClick={() => setMobileOpen(false)}>
             <Button variant="hero" className="mt-2 w-full justify-center">
-              Create Account
+              Start Practicing
               <MoveRight className="h-4 w-4" />
             </Button>
           </Link>

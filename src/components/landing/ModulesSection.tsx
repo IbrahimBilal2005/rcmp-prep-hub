@@ -14,7 +14,7 @@ import { revealTransition, revealUp, revealViewport, revealVisible } from "@/lib
 const modules = [
   {
     icon: BookOpen,
-    title: "Understanding the Test",
+    title: "RCMP Entrance Assessment Overview",
     desc: "Learn the test format, scoring, and strategic approach to maximize your results.",
     details:
       "This module covers how the aptitude exam is structured, how pacing affects outcomes, and what strong candidates do differently before they ever start answering questions.",
@@ -22,7 +22,7 @@ const modules = [
   },
   {
     icon: Calculator,
-    title: "Numerical Skills",
+    title: "RCMP Numerical Skills Practice",
     desc: "Master arithmetic, data interpretation, and number series with targeted practice.",
     details:
       "Focuses on the numerical reasoning patterns most likely to slow candidates down under pressure, with drills built around accuracy first and speed second.",

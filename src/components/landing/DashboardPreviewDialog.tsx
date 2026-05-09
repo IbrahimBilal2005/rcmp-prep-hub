@@ -362,7 +362,7 @@ const DashboardPreviewDialog = ({ children }: DashboardPreviewDialogProps) => {
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <Link to="/signup?mode=signup" className="flex-1">
               <Button variant="hero" size="lg" className="w-full">
-                Create Account
+                Start Practicing
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>

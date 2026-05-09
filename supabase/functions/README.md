@@ -11,4 +11,4 @@ Stripe function setup
 
 Webhook URL after deploy:
 
-`https://enzfmuclxdbrjrfaivcg.supabase.co/functions/v1/stripe-webhook`
+`https://<project-ref>.supabase.co/functions/v1/stripe-webhook`

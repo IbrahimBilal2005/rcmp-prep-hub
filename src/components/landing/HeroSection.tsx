@@ -50,7 +50,7 @@ const HeroSection = () => {
               className="mt-8 max-w-xl"
             >
               <p className="section-copy text-[1.04rem]">
-                A focused RCMP-style study environment with guided modules, timed practice, and review tools designed to keep your next move clear without clutter or noise.
+                RCMP Online Entrance Assessment practice with timed simulations, memory training, spatial reasoning, and section-by-section preparation.
               </p>
             </motion.div>
 
@@ -62,7 +62,7 @@ const HeroSection = () => {
             >
               <Link to="/signup?mode=signup" className="w-full sm:w-auto">
                 <Button variant="hero" size="xl" className="w-full sm:w-auto">
-                  Create Account
+                  Start Practicing
                   <ArrowRight className="h-5 w-5" />
                 </Button>
               </Link>

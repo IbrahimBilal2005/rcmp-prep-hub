@@ -8,8 +8,8 @@ truncate table public.modules restart identity cascade;
 
 insert into public.modules (slug, title, description, sort_order, is_published)
 values
-  ('understanding-the-rcmp-aptitude-test', 'Understanding the RCMP Aptitude Test', 'Learn the test format, scoring methodology, and develop a strategic approach to maximize your results on test day.', 1, true),
-  ('numerical-skills', 'Numerical Skills', 'Master arithmetic reasoning, data interpretation, and number series through structured practice and proven strategies.', 2, true),
+  ('understanding-the-rcmp-aptitude-test', 'RCMP Entrance Assessment Overview', 'Learn the test format, scoring methodology, and develop a strategic approach to maximize your results on test day.', 1, true),
+  ('numerical-skills', 'RCMP Numerical Skills Practice', 'Master arithmetic reasoning, data interpretation, and number series through structured practice and proven strategies.', 2, true),
   ('memory-observation', 'Memory & Observation', 'Develop powerful techniques to recall details from images, text passages, and complex scenarios under time pressure.', 3, true),
   ('spatial-reasoning', 'Spatial Reasoning', 'Practice pattern recognition, shape rotation, mirror images, and visual-spatial problem solving.', 4, true),
   ('language-logical-reasoning', 'Language & Logical Reasoning', 'Strengthen verbal comprehension, analogies, syllogisms, and logical deduction skills.', 5, true),
