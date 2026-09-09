@@ -1,3 +1,4 @@
+import { useUrlState } from "@/hooks/useUrlState";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
@@ -426,13 +427,15 @@ const AdminDashboard = () => {
   const modules = resolvedCourseContent.modules;
   const practiceTests = resolvedCourseContent.practiceTests;
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<AdminTab>("modules");
+  const [activeTab, setActiveTab] = useUrlState<AdminTab>("tab", "modules", ["modules", "tests", "users"]);
   const [moduleDrafts, setModuleDrafts] = useState<ModuleInfo[]>(() => createModuleDrafts(modules));
   const [testDrafts, setTestDrafts] = useState<PracticeTest[]>(() => createTestDrafts(practiceTests));
   const [userRecords, setUserRecords] = useState<AdminUserRecord[]>(adminUsers);
-  const [selectedModuleId, setSelectedModuleId] = useState<number>(modules[0]?.id ?? 1);
-  const [selectedTestId, setSelectedTestId] = useState<string>(practiceTests[0]?.id ?? "numerical");
-  const [selectedUserId, setSelectedUserId] = useState<string>(adminUsers[0]?.id ?? "");
+  const [moduleParam, setModuleParam] = useUrlState("module", String(modules[0]?.id ?? 1));
+  const selectedModuleId = moduleDrafts.find((module) => module.id === Number(moduleParam))?.id ?? moduleDrafts[0]?.id ?? 1;
+  const setSelectedModuleId = (id: number) => setModuleParam(String(id));
+  const [selectedTestId, setSelectedTestId] = useUrlState("test", practiceTests[0]?.id ?? "numerical");
+  const [selectedUserId, setSelectedUserId] = useUrlState("user", adminUsers[0]?.id ?? "");
   const [createModuleOpen, setCreateModuleOpen] = useState(false);
   const [createLessonOpen, setCreateLessonOpen] = useState(false);
   const [createModuleQuestionOpen, setCreateModuleQuestionOpen] = useState(false);
@@ -466,8 +469,6 @@ const AdminDashboard = () => {
   const hydrateCourseDrafts = useCallback((nextModules: ModuleInfo[], nextPracticeTests: PracticeTest[]) => {
     setModuleDrafts(createModuleDrafts(nextModules));
     setTestDrafts(createTestDrafts(nextPracticeTests));
-    setSelectedModuleId((current) => nextModules.find((module) => module.id === current)?.id ?? nextModules[0]?.id ?? 1);
-    setSelectedTestId((current) => nextPracticeTests.find((test) => test.id === current)?.id ?? nextPracticeTests[0]?.id ?? "numerical");
   }, []);
 
   const refreshCourseContent = async ({ syncDrafts = true }: { syncDrafts?: boolean } = {}) => {
@@ -823,7 +824,6 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     setUserRecords(adminUsers);
-    setSelectedUserId((current) => adminUsers.find((user) => user.id === current)?.id ?? adminUsers[0]?.id ?? "");
   }, [adminUsers]);
 
   if (moduleDrafts.length === 0 || testDrafts.length === 0) {
@@ -1654,15 +1654,15 @@ const AdminDashboard = () => {
       <header className="sticky top-0 z-50 border-b border-border/70 bg-background/88 backdrop-blur-xl">
         <div className="app-shell flex h-16 items-center justify-between gap-4">
           <Link to="/" className="flex items-center gap-2 min-w-0">
-            <BrandLockup size="sm" subtitle="Admin" textClassName="text-foreground" />
+            <BrandLockup size="sm" subtitle="Admin" textWrapperClassName="hidden min-[400px]:block" textClassName="text-foreground" />
           </Link>
           <Button
             variant="ghost"
             size="sm"
             className="text-muted-foreground hover:text-foreground"
             onClick={() => {
-              clearAuthSession();
-              navigate("/");
+              void clearAuthSession().catch(console.error);
+              navigate("/", { replace: true });
             }}
           >
             <LogOut className="h-4 w-4 mr-1" />

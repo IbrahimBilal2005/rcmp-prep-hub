@@ -117,6 +117,7 @@ export const hydratePersistedProgress = async (userIdOverride?: string) => {
     { data: moduleProgressRows, error: moduleProgressError },
     { data: lessonCompletionRows, error: lessonCompletionError },
     { data: practiceAttemptRows, error: practiceAttemptError },
+    { data: lessonRows, error: lessonOrderError },
   ] = await Promise.all([
     supabase
       .from("user_module_progress")
@@ -131,30 +132,39 @@ export const hydratePersistedProgress = async (userIdOverride?: string) => {
       .select("id, score, total_questions, duration_seconds, answers, submitted_at, started_at, timed_out, practice_tests!inner(slug)")
       .eq("user_id", userId)
       .order("submitted_at", { ascending: false }),
+    supabase.from("lessons").select("id, module_id, sort_order").order("sort_order", { ascending: true }),
   ]);
 
-  if (moduleProgressError || lessonCompletionError || practiceAttemptError) {
+  if (moduleProgressError || lessonCompletionError || practiceAttemptError || lessonOrderError) {
     console.error("Progress hydration returned partial errors", {
       moduleProgressError,
       lessonCompletionError,
       practiceAttemptError,
+      lessonOrderError,
     });
   }
 
   const safeModuleProgressRows = moduleProgressError ? [] : (moduleProgressRows ?? []);
   const safeLessonCompletionRows = lessonCompletionError ? [] : (lessonCompletionRows ?? []);
   const safePracticeAttemptRows = practiceAttemptError ? [] : (practiceAttemptRows ?? []);
+  const lessonPositions = new Map<number, number>();
+  const moduleCounts = new Map<number, number>();
+  for (const lesson of lessonRows ?? []) {
+    const index = moduleCounts.get(lesson.module_id) ?? 0;
+    lessonPositions.set(lesson.id, index);
+    moduleCounts.set(lesson.module_id, index + 1);
+  }
 
   const completionMap = safeLessonCompletionRows.reduce<Record<number, number[]>>((acc, row) => {
     const completion = row as unknown as LessonCompletionRow;
     const moduleId = completion.lessons?.module_id;
-    const sortOrder = completion.lessons?.sort_order;
+    const lessonIndex = lessonPositions.get(completion.lesson_id);
 
-    if (!moduleId || !sortOrder) {
+    if (!moduleId || lessonIndex === undefined) {
       return acc;
     }
 
-    acc[moduleId] = [...(acc[moduleId] ?? []), sortOrder - 1].sort((a, b) => a - b);
+    acc[moduleId] = [...new Set([...(acc[moduleId] ?? []), lessonIndex])].sort((a, b) => a - b);
     return acc;
   }, {});
 
@@ -195,7 +205,11 @@ export const hydratePersistedProgress = async (userIdOverride?: string) => {
     }
   });
 
-  replaceAllModuleProgress(progressMap);
+  // A request from an old account must not populate the next account's cache.
+  if (getStoredAuthSession()?.id !== userId) return;
+  if (!moduleProgressError && !lessonCompletionError && !lessonOrderError) {
+    replaceAllModuleProgress(progressMap);
+  }
 
   const attempts = safePracticeAttemptRows.map((row) => {
     const attempt = row as unknown as PracticeAttemptRow;
@@ -213,19 +227,26 @@ export const hydratePersistedProgress = async (userIdOverride?: string) => {
     } satisfies PracticeAttemptRecord;
   }).filter((attempt) => Boolean(attempt.testId));
 
-  replacePracticeAttempts(attempts);
+  if (!practiceAttemptError) replacePracticeAttempts(attempts);
 };
 
+const moduleSyncQueue = new Map<string, Promise<void>>();
+
 export const persistModuleProgress = async (record: ModuleProgressRecord) => {
-  if (!canSyncProgress() || !supabase) {
-    return;
-  }
-
+  if (!canSyncProgress() || !supabase) return;
   const userId = await getCurrentUserId();
-  if (!userId) {
-    return;
-  }
+  if (!userId) return;
+  const key = `${userId}:${record.moduleId}`;
+  const pending = (moduleSyncQueue.get(key) ?? Promise.resolve())
+    .then(() => syncModuleProgress(record, userId))
+    .catch((error) => console.error("Failed to save lesson progress", error));
+  moduleSyncQueue.set(key, pending);
+  await pending;
+  if (moduleSyncQueue.get(key) === pending) moduleSyncQueue.delete(key);
+};
 
+const syncModuleProgress = async (record: ModuleProgressRecord, userId: string) => {
+  if (!supabase || getStoredAuthSession()?.id !== userId) return;
   const { error: progressError } = await supabase
     .from("user_module_progress")
     .upsert(
@@ -250,19 +271,8 @@ export const persistModuleProgress = async (record: ModuleProgressRecord) => {
 
   const lessonRows = await getLessonRowsForModule(record.moduleId);
   const completedLessonIds = lessonRows
-    .filter((lesson) => record.completedLessons.includes(lesson.sort_order - 1))
+    .filter((lesson, index) => record.completedLessons.includes(index))
     .map((lesson) => lesson.id);
-
-  const { error: deleteError } = await supabase
-    .from("lesson_completions")
-    .delete()
-    .eq("user_id", userId)
-    .in("lesson_id", lessonRows.map((lesson) => lesson.id));
-
-  if (deleteError) {
-    console.error("Failed to reset lesson completions before sync", deleteError);
-    return;
-  }
 
   if (completedLessonIds.length > 0) {
     const { error: completionError } = await supabase
@@ -278,7 +288,13 @@ export const persistModuleProgress = async (record: ModuleProgressRecord) => {
 
     if (completionError) {
       console.error("Failed to persist lesson completions", completionError);
+      return;
     }
+  }
+  const incompleteLessonIds = lessonRows.filter((lesson) => !completedLessonIds.includes(lesson.id)).map((lesson) => lesson.id);
+  if (incompleteLessonIds.length > 0) {
+    const { error } = await supabase.from("lesson_completions").delete().eq("user_id", userId).in("lesson_id", incompleteLessonIds);
+    if (error) console.error("Failed to update incomplete lessons", error);
   }
 };
 

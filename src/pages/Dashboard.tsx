@@ -1,3 +1,4 @@
+import { useUrlState } from "@/hooks/useUrlState";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
@@ -71,7 +72,7 @@ const Dashboard = () => {
   const modules = resolvedCourseContent.modules;
   const practiceTests = resolvedCourseContent.practiceTests;
   const contentError = resolvedCourseContent.error;
-  const [activeTab, setActiveTab] = useState<Tab>("modules");
+  const [activeTab, setActiveTab] = useUrlState<Tab>("tab", "modules", ["modules", "tests"]);
   const [checkoutNotice, setCheckoutNotice] = useState("");
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -84,12 +85,14 @@ const Dashboard = () => {
     }
 
     void (async () => {
-      await initializeAuthSession();
-      setCheckoutNotice("Premium access is now active on your account.");
+      const session = await initializeAuthSession();
+      setCheckoutNotice(session?.plan === "premium"
+        ? "Premium access is now active on your account."
+        : "We’re still confirming premium access. Please refresh shortly.");
       const nextParams = new URLSearchParams(searchParams);
       nextParams.delete("checkout");
       setSearchParams(nextParams, { replace: true });
-    })();
+    })().catch(() => setCheckoutNotice("We couldn’t confirm your access yet. Please refresh to try again."));
   }, [searchParams, setSearchParams]);
 
   const testMeta = useMemo<Record<string, TestCardMeta>>(
@@ -285,12 +288,12 @@ const Dashboard = () => {
         >
           {stats.map((stat) => (
             <div key={stat.label} className="glass-card rounded-xl p-4">
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col items-start sm:flex-row sm:items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
                   <stat.icon className="h-5 w-5 text-accent" />
                 </div>
                 <div>
-                  <p className="text-2xl font-heading font-bold text-foreground">{stat.value}</p>
+                  <p className="text-xl sm:text-2xl font-heading font-bold text-foreground break-words">{stat.value}</p>
                   <p className="text-xs text-muted-foreground">{stat.label}</p>
                 </div>
               </div>

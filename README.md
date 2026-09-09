@@ -182,3 +182,9 @@ npm run build
 - Progress is currently stored locally in browser storage
 - Landing-page anchor navigation and route changes reset scroll correctly
 - The current visual direction is tuned toward a premium RCMP / police exam-prep feel rather than a generic SaaS theme
+
+## Production deployment
+
+See [production routing and session setup](docs/production-deployment.md) for Render rewrites, Supabase redirects, and the configurable inactivity timeout.
+
+The [production behavior audit](docs/code-audit.md) describes the logic and responsive-layout fixes and how to run the browser checks.

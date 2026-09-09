@@ -47,9 +47,11 @@ const LessonView = () => {
 
   useEffect(() => {
     let active = true;
+    setResolvedVideoUrl(null);
+    setResolvedPosterUrl(null);
 
     void (async () => {
-      if (!lesson) {
+      if (!lesson || !lessonUnlocked) {
         if (active) {
           setResolvedVideoUrl(null);
           setResolvedPosterUrl(null);
@@ -57,7 +59,7 @@ const LessonView = () => {
         return;
       }
 
-      const [videoUrl, posterUrl] = await Promise.all([
+      const [video, poster] = await Promise.allSettled([
         resolveLessonAssetUrl("video", lesson.videoUrl),
         resolveLessonAssetUrl("poster", lesson.posterUrl),
       ]);
@@ -66,18 +68,18 @@ const LessonView = () => {
         return;
       }
 
-      setResolvedVideoUrl(videoUrl);
-      setResolvedPosterUrl(posterUrl);
+      setResolvedVideoUrl(video.status === "fulfilled" ? video.value : null);
+      setResolvedPosterUrl(poster.status === "fulfilled" ? poster.value : null);
     })();
 
     return () => {
       active = false;
     };
-  }, [lesson]);
+  }, [lesson, lessonUnlocked]);
 
   if (isLoading && modules.length === 0) {
     return (
-      <div className="min-h-screen overflow-x-hidden bg-background">
+      <div className="min-h-screen overflow-x-clip bg-background">
         <DashboardHeader />
         <div className="container mx-auto max-w-5xl px-4 py-10">
           <div className="text-center">
@@ -91,7 +93,7 @@ const LessonView = () => {
 
   if (!mod) {
     return (
-      <div className="min-h-screen overflow-x-hidden bg-background">
+      <div className="min-h-screen overflow-x-clip bg-background">
         <DashboardHeader />
         <div className="container mx-auto max-w-5xl px-4 py-10">
           <div className="text-center">
@@ -134,7 +136,7 @@ const LessonView = () => {
   };
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-background">
+    <div className="min-h-screen overflow-x-clip bg-background">
       <DashboardHeader />
 
       <div className="container mx-auto max-w-6xl px-4 py-8 sm:py-10">

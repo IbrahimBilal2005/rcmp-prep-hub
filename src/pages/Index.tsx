@@ -1,3 +1,4 @@
+import PreparationFaq from "@/components/landing/PreparationFaq";
 import { Suspense, lazy } from "react";
 import Navbar from "@/components/landing/Navbar";
 import HeroSection from "@/components/landing/HeroSection";
@@ -19,6 +20,7 @@ const Index = () => {
           <ModulesSection />
           <HowItWorksSection />
           <PricingSection />
+          <PreparationFaq />
         </Suspense>
       </main>
       <Suspense fallback={<SectionFallback />}>

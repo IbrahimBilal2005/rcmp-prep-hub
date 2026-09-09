@@ -102,8 +102,21 @@ const ModuleDetail = () => {
         ? Math.min(Math.max(lessonIndex, 0), (mod?.lessons.length ?? 1) - 1)
         : progress?.lastLessonIndex ?? 0,
     );
-    setQuizStarted(Boolean(progress?.quizStarted && !progress.quizCompleted));
+    setQuizStarted(false);
+    setCurrentQ(0);
+    setSelectedAnswer(null);
+    setShowExplanation(false);
+    setScore(0);
+    setQuizFinished(false);
+    setAnsweredCount(0);
   }, [moduleId, mod?.lessons.length, searchParams]);
+
+  useEffect(() => {
+    const section = searchParams.get("section");
+    if (mod && (section === "quiz" || section === "lessons")) {
+      document.getElementById(`module-${section}`)?.scrollIntoView({ block: "start" });
+    }
+  }, [mod, searchParams]);
 
   if (isLoading && modules.length === 0) {
     return (
@@ -239,7 +252,7 @@ const ModuleDetail = () => {
   };
 
   const startQuiz = () => {
-    if (lockedModule) {
+    if (lockedModule || quiz.length === 0) {
       return;
     }
 
@@ -297,7 +310,7 @@ const ModuleDetail = () => {
           </div>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3 mb-8">
+        <motion.div id="module-lessons" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3 mb-8 scroll-mt-24">
           {mod.lessons.map((lesson, i) => {
             const isSelected = selectedLessonIndex === i;
             const isCompleted = completedLessons.includes(i);
@@ -341,7 +354,7 @@ const ModuleDetail = () => {
           })}
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="relative glass-card rounded-3xl p-6 sm:p-8 overflow-hidden">
+        <motion.div id="module-quiz" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="relative glass-card rounded-3xl p-6 sm:p-8 overflow-hidden scroll-mt-24">
           {lockedModule && (
             <LockedMask
               title="Locked module"
@@ -382,7 +395,7 @@ const ModuleDetail = () => {
                 <p className="text-sm text-muted-foreground mb-6">
                   Move into the quiz whenever you are ready. You do not need a separate tab to start it.
                 </p>
-                <Button variant="hero" size="lg" onClick={startQuiz}>
+                <Button variant="hero" size="lg" onClick={startQuiz} disabled={quiz.length === 0}>
                   Start Quiz <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               </div>
@@ -399,7 +412,7 @@ const ModuleDetail = () => {
                 <div className="w-full max-w-xl mx-auto bg-background rounded-full h-3 mb-6 overflow-hidden">
                   <div className="h-full gradient-accent rounded-full transition-all duration-500" style={{ width: `${(score / quiz.length) * 100}%` }} />
                 </div>
-                <div className="flex gap-3 justify-center">
+                <div className="flex flex-wrap gap-3 justify-center">
                   <Button variant="outline" onClick={resetQuiz}>
                     <RotateCcw className="h-4 w-4 mr-1" /> Retry
                   </Button>

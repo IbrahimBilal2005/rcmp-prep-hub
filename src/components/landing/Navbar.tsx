@@ -56,7 +56,10 @@ const Navbar = () => {
         </div>
 
         <button
-          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border border-[rgba(232,240,250,0.95)] bg-[rgba(244,249,255,0.68)] p-0 text-foreground shadow-[0_14px_36px_-24px_rgba(15,23,42,0.24)] backdrop-blur-xl md:hidden"
+          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border border-[rgba(232,240,250,0.95)] bg-[rgba(244,249,255,0.68)] p-0 text-foreground shadow-[0_14px_36px_-24px_rgba(15,23,42,0.24)] backdrop-blur-xl lg:hidden"
+          aria-label={mobileOpen ? "Close navigation" : "Open navigation"}
+          aria-expanded={mobileOpen}
+          aria-controls="mobile-navigation"
           onClick={() => setMobileOpen(!mobileOpen)}
         >
           {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -64,7 +67,7 @@ const Navbar = () => {
       </div>
 
       {mobileOpen && (
-        <div className="mx-auto mt-3 max-w-[88rem] space-y-3 rounded-[2rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.8),rgba(247,243,238,0.7))] px-4 py-4 text-center shadow-[0_28px_80px_-48px_rgba(15,23,42,0.28),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-2xl md:hidden sm:px-5 sm:py-5">
+        <div id="mobile-navigation" className="mx-auto mt-3 max-w-[88rem] space-y-3 rounded-[2rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.8),rgba(247,243,238,0.7))] px-4 py-4 text-center shadow-[0_28px_80px_-48px_rgba(15,23,42,0.28),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-2xl lg:hidden sm:px-5 sm:py-5">
           <a
             href="#modules"
             className="block rounded-2xl px-3 py-3 text-sm font-medium text-muted-foreground hover:bg-white/50 hover:text-foreground"

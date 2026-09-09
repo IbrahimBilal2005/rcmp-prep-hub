@@ -18,14 +18,14 @@ export const getStoredAuthSession = (): AuthSession | null => {
     return null;
   }
 
-  const raw = window.localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    return null;
-  }
-
   try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? (parsed as AuthSession) : null;
+    return parsed && typeof parsed.id === "string" && typeof parsed.email === "string"
+      && typeof parsed.name === "string" && typeof parsed.createdAt === "string"
+      && ["user", "admin"].includes(parsed.role) && ["free", "premium"].includes(parsed.plan)
+      && ["active", "invited", "suspended"].includes(parsed.status) ? (parsed as AuthSession) : null;
   } catch {
     return null;
   }

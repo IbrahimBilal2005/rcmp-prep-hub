@@ -1,7 +1,10 @@
-import { Suspense, lazy, useEffect, useState } from "react";
+import SeoMetadata from "@/components/SeoMetadata";
+import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
+import { watchSessionActivity } from "@/services/auth/idle-session";
+import { Suspense, createContext, lazy, useContext, useEffect, useState } from "react";
 import { MotionConfig } from "framer-motion";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
-import { getAuthSession, initializeAuthSession, isAuthenticated, subscribeToAuthChanges } from "@/lib/auth";
+import { clearAuthSession, getAuthSession, initializeAuthSession, isAuthenticated, subscribeToAuthChanges } from "@/lib/auth";
 import { AppProviders } from "@/providers/AppProviders";
 import { AUTH_SESSION_CHANGED_EVENT } from "@/services/auth/session-storage";
 
@@ -14,19 +17,26 @@ const PracticeTestView = lazy(() => import("./pages/PracticeTestView.tsx"));
 const Signup = lazy(() => import("./pages/Signup.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
+const AuthVersionContext = createContext(0);
+
 const RequireAuth = () => {
+  useContext(AuthVersionContext);
+  const location = useLocation();
   if (!isAuthenticated()) {
-    return <Navigate to="/signup?mode=signup" replace />;
+    return <Navigate to="/signup?mode=login" state={{ from: location.pathname + location.search + location.hash }} replace />;
   }
 
-  return <Outlet />;
+  const session = getAuthSession();
+  return <Outlet key={`${session.id}:${session.plan}:${session.role}:${session.status}`} />;
 };
 
 const RequireAdmin = () => {
+  useContext(AuthVersionContext);
+  const location = useLocation();
   const session = getAuthSession();
 
-  if (!session) {
-    return <Navigate to="/signup?mode=login" replace />;
+  if (!session || session.status === "suspended") {
+    return <Navigate to="/signup?mode=login" state={{ from: location.pathname + location.search + location.hash }} replace />;
   }
 
   if (session.role !== "admin") {
@@ -37,20 +47,44 @@ const RequireAdmin = () => {
 };
 
 const ScrollToTop = () => {
-  const { pathname } = useLocation();
+  const { pathname, hash } = useLocation();
 
   useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-  }, [pathname]);
+    if (!hash) {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      return;
+    }
+    let id: string;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const scroll = () => {
+      const target = document.getElementById(id);
+      if (!target) return false;
+      target.scrollIntoView({ block: "start" });
+      return true;
+    };
+    if (scroll()) return;
+    // Landing sections load lazily, so the anchor may not exist on first render.
+    const observer = new MutationObserver(() => { if (scroll()) observer.disconnect(); });
+    observer.observe(document.body, { childList: true, subtree: true });
+    const timer = setTimeout(() => observer.disconnect(), 10_000);
+    return () => { clearTimeout(timer); observer.disconnect(); };
+  }, [pathname, hash]);
 
   return null;
+};
+
+const PageBoundary = ({ children }: { children: React.ReactNode }) => {
+  const { pathname } = useLocation();
+  return <RouteErrorBoundary key={pathname}>{children}</RouteErrorBoundary>;
 };
 
 const RouteFallback = () => <div className="min-h-screen bg-background" />;
 
 const AuthBootstrap = ({ children }: { children: React.ReactNode }) => {
+  const isHomepage = useLocation().pathname === "/";
   const [ready, setReady] = useState(false);
-  const [, setAuthVersion] = useState(0);
+  const [authVersion, setAuthVersion] = useState(0);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -64,7 +98,12 @@ const AuthBootstrap = ({ children }: { children: React.ReactNode }) => {
     };
 
     void (async () => {
-      await initializeAuthSession();
+      try {
+        await initializeAuthSession();
+      } catch (error) {
+        if (active) setError(error instanceof Error ? error.message : "Unable to restore your session. Please reload to retry.");
+        return;
+      }
 
       if (!active) {
         return;
@@ -90,19 +129,28 @@ const AuthBootstrap = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
-  if (!ready) {
+  useEffect(() => watchSessionActivity(
+    () => Boolean(getAuthSession()),
+    () => { void clearAuthSession().catch(console.error); },
+  ), []);
+
+  if (error && !isHomepage) return <div className="min-h-screen flex flex-col items-center justify-center gap-4" role="alert"><p>{error}</p><button onClick={() => window.location.reload()}>Retry</button></div>;
+
+  if (!ready && !isHomepage) {
     return <div className="min-h-screen bg-background" />;
   }
 
-  return <>{children}</>;
+  return <AuthVersionContext.Provider value={authVersion}>{children}</AuthVersionContext.Provider>;
 };
 
 const App = () => (
   <AppProviders>
     <MotionConfig reducedMotion="user">
       <BrowserRouter>
+        <SeoMetadata />
         <AuthBootstrap>
           <ScrollToTop />
+          <PageBoundary>
           <Suspense fallback={<RouteFallback />}>
             <Routes>
               <Route path="/" element={<Index />} />
@@ -119,6 +167,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
+          </PageBoundary>
         </AuthBootstrap>
       </BrowserRouter>
     </MotionConfig>

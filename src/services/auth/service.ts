@@ -1,3 +1,4 @@
+import { clearSessionActivity, isSessionIdle, recordSessionActivity } from "@/services/auth/idle-session";
 import { appConfig } from "@/config/app";
 import { clearModuleProgress } from "@/lib/moduleProgressStorage";
 import { clearPracticeAttempts } from "@/lib/practiceTestStorage";
@@ -108,6 +109,7 @@ const buildSessionFromSupabaseUser = async (
   user: NonNullable<Awaited<ReturnType<typeof supabase.auth.getUser>>["data"]["user"]>,
   fallback?: AuthSession | null,
 ): Promise<AuthSession> => {
+  fallback = fallback?.id === user.id ? fallback : null;
   let profile = await loadProfileRow(user.id);
 
   if (isPremiumExpired(profile)) {
@@ -128,7 +130,7 @@ const buildSessionFromSupabaseUser = async (
 
   return buildProfile(
     user.id,
-    fallback || null,
+    fallback,
     user.email || fallback?.email || "",
     fullName,
     profile?.plan || fallback?.plan || "free",
@@ -145,8 +147,8 @@ const getActiveSupabaseUser = async () => {
 
   const { data, error } = await supabase.auth.getSession();
 
-  if (!error && data.session?.user) {
-    return data.session.user;
+  if (!error) {
+    return data.session?.user ?? null;
   }
 
   const { data: refreshedData, error: refreshError } = await supabase.auth.refreshSession();
@@ -175,13 +177,13 @@ export const saveAuthSession = (session: AuthSession) => {
 };
 
 export const clearAuthSession = async () => {
-  if (supabase && !appConfig.useMockAuth) {
-    await supabase.auth.signOut();
-  }
-
   clearStoredAuthSession();
+  clearSessionActivity();
   clearModuleProgress();
   clearPracticeAttempts();
+  if (supabase && !appConfig.useMockAuth) {
+    await supabase.auth.signOut({ scope: "local" });
+  }
 };
 
 export const isAuthenticated = () => {
@@ -190,10 +192,15 @@ export const isAuthenticated = () => {
 };
 
 export const initializeAuthSession = async () => {
-  if (appConfig.useMockAuth || !supabase) {
+  if (isSessionIdle()) {
+    await clearAuthSession();
+    return null;
+  }
+  if (appConfig.useMockAuth) {
     return getAuthSession();
   }
 
+  if (!supabase) throw new Error("Supabase authentication is not configured.");
   const stored = getAuthSession();
   const user = await getActiveSupabaseUser();
 
@@ -211,55 +218,67 @@ export const initializeAuthSession = async () => {
     return null;
   }
   saveStoredAuthSession(session);
-  await hydratePersistedProgress(session.id);
+  recordSessionActivity();
+  await hydratePersistedProgress(session.id).catch((error) => {
+    console.error("Failed to restore saved progress", error);
+  });
   return session;
 };
 
 export const subscribeToAuthChanges = (onResolved?: (session: AuthSession | null) => void) => {
-  if (appConfig.useMockAuth || !supabase) {
+  if (appConfig.useMockAuth) {
     return () => undefined;
   }
 
-  const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+  if (!supabase) return () => undefined;
+  let active = true;
+  let revision = 0;
+  const { data } = supabase.auth.onAuthStateChange((event, session) => {
+    const currentRevision = ++revision;
     if (!session?.user) {
-      if (event === "SIGNED_OUT" || event === "USER_DELETED") {
-        clearStoredAuthSession();
-        clearModuleProgress();
-        clearPracticeAttempts();
-      }
-
-      onResolved?.(null);
-      return;
-    }
-
-    const nextSession = await buildSessionFromSupabaseUser(session.user, getAuthSession());
-    if (nextSession.status === "suspended") {
-      await supabase.auth.signOut();
       clearStoredAuthSession();
+      clearSessionActivity();
       clearModuleProgress();
       clearPracticeAttempts();
       onResolved?.(null);
       return;
     }
-    saveStoredAuthSession(nextSession);
-    await hydratePersistedProgress(nextSession.id);
-    onResolved?.(nextSession);
+
+    // Leave the auth callback before making calls that acquire Supabase's auth lock.
+    setTimeout(() => {
+      void (async () => {
+        if (!active || currentRevision !== revision) return;
+        if (isSessionIdle()) { await clearAuthSession(); return; }
+        const nextSession = await buildSessionFromSupabaseUser(session.user, getAuthSession());
+        if (!active || currentRevision !== revision) return;
+        if (nextSession.status === "suspended") {
+          await clearAuthSession();
+          return;
+        }
+        saveStoredAuthSession(nextSession);
+        onResolved?.(nextSession);
+      })().catch((error) => console.error("Unable to update auth profile", error));
+    }, 0);
   });
 
   return () => {
+    active = false;
+    revision++;
     data.subscription.unsubscribe();
   };
 };
 
 export const signUpWithEmail = async ({ name, email, password }: AccountCredentials) => {
-  if (appConfig.useMockAuth || !supabase) {
+  if (appConfig.useMockAuth) {
     return buildProfile("mock-user", null, email, name);
   }
 
+  if (!supabase) throw new Error("Supabase authentication is not configured.");
   const result = await supabase.auth.signUp({
     email,
     password,
     options: {
+      emailRedirectTo: `${appConfig.appUrl}/signup?mode=login`,
       data: {
         full_name: name?.trim() || "",
       },
@@ -275,6 +294,11 @@ export const signUpWithEmail = async ({ name, email, password }: AccountCredenti
   if (!user) {
     throw new Error("Supabase did not return a user record after sign up.");
   }
+
+  if (!result.data.session) {
+    return null;
+  }
+  recordSessionActivity();
 
   if (name?.trim()) {
     await updateProfileName(user.id, name);
@@ -294,7 +318,7 @@ export const signUpWithEmail = async ({ name, email, password }: AccountCredenti
 export const signInWithEmail = async ({ email, password }: AccountCredentials) => {
   const existing = getAuthSession();
 
-  if (appConfig.useMockAuth || !supabase) {
+  if (appConfig.useMockAuth) {
     if (!existing || existing.email.toLowerCase() !== email.trim().toLowerCase()) {
       throw new Error("No account found for that email yet. Create an account first.");
     }
@@ -302,6 +326,7 @@ export const signInWithEmail = async ({ email, password }: AccountCredentials) =
     return existing;
   }
 
+  if (!supabase) throw new Error("Supabase authentication is not configured.");
   const result = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -317,6 +342,7 @@ export const signInWithEmail = async ({ email, password }: AccountCredentials) =
     throw new Error("Supabase did not return a user record after sign in.");
   }
 
+  recordSessionActivity();
   const session = await buildSessionFromSupabaseUser(user, existing);
   if (session.status === "suspended") {
     await supabase.auth.signOut();

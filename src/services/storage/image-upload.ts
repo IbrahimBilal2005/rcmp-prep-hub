@@ -79,7 +79,7 @@ export const optimizeImageForUpload = async (file: File) => {
   });
 };
 
-export const withUploadTimeout = async <T>(operation: Promise<T>, label = "Upload", timeoutMs = IMAGE_UPLOAD_TIMEOUT_MS) => {
+export const withUploadTimeout = async <T>(operation: PromiseLike<T>, label = "Upload", timeoutMs = IMAGE_UPLOAD_TIMEOUT_MS) => {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
   const timeout = new Promise<never>((_, reject) => {

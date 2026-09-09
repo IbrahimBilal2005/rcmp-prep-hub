@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Check, ChevronRight, Crown, LockKeyhole, Mail, UserRound } from "lucide-react";
 import BrandLockup from "@/components/brand/BrandLockup";
 import { Button } from "@/components/ui/button";
@@ -14,8 +14,14 @@ type Step = "account" | "plan";
 
 const Signup = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = (session: AuthSession) => {
+    const from = location.state?.from;
+    return typeof from === "string" && /^\/(dashboard|admin|module|test)([/?#]|$)/.test(from)
+      ? from : session.role === "admin" ? "/admin" : "/dashboard";
+  };
   const [searchParams, setSearchParams] = useSearchParams();
-  const [storedSession] = useState(() => getAuthSession());
+  const [storedSession, setStoredSession] = useState(() => getAuthSession());
   const modeParam = searchParams.get("mode");
   const stepParam = searchParams.get("step");
   const checkoutParam = searchParams.get("checkout");
@@ -37,9 +43,7 @@ const Signup = () => {
     setPendingProfile(
       stepParam === "plan" && storedSession
         ? {
-            name: storedSession.name,
-            email: storedSession.email,
-            createdAt: storedSession.createdAt,
+            ...storedSession,
           }
         : null,
     );
@@ -68,14 +72,19 @@ const Signup = () => {
       if (mode === "login") {
         const session = await signInWithEmail({ email: submittedEmail, password: submittedPassword });
         saveAuthSession(session);
-        navigate(session.role === "admin" ? "/admin" : "/dashboard");
+        navigate(returnTo(session), { replace: true });
         return;
       }
 
       const profile = await signUpWithEmail({ name: submittedName, email: submittedEmail, password: submittedPassword });
+      if (!profile) {
+        setError("Check your email to confirm your account, then log in to continue.");
+        return;
+      }
       saveAuthSession(profile);
+      setStoredSession(profile);
       setPendingProfile(profile);
-      setStep("plan");
+      setSearchParams({ step: "plan" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
     } finally {
@@ -103,7 +112,7 @@ const Signup = () => {
 
       if (result.status === "activated") {
         saveAuthSession(session);
-        navigate(session.role === "admin" ? "/admin" : "/dashboard");
+        navigate(returnTo(session), { replace: true });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to continue with that plan right now.");
@@ -117,7 +126,7 @@ const Signup = () => {
       <header className="sticky top-0 z-50 border-b border-border/70 bg-background/88 backdrop-blur-xl">
         <div className="app-shell flex h-16 items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <BrandLockup size="sm" subtitle="Account Setup" textClassName="text-foreground" />
+            <BrandLockup size="sm" subtitle="Account Setup" textWrapperClassName="hidden min-[400px]:block" textClassName="text-foreground" />
           </Link>
           <div className="flex items-center gap-2">
             <Link to="/">
@@ -325,7 +334,7 @@ const Signup = () => {
                   <Button variant="hero" size="lg" disabled={!selectedPlan || isSubmitting} onClick={handlePlanSubmit}>
                     {selectedPlan === premiumPlan.tier ? "Continue To Premium" : selectedPlan === freePlan.tier ? "Enter Free Plan" : "Choose A Plan To Continue"}
                   </Button>
-                  <Button variant="outline" size="lg" onClick={() => setStep("account")} disabled={isSubmitting}>
+                  <Button variant="outline" size="lg" onClick={() => setSearchParams({ mode })} disabled={isSubmitting}>
                     Back
                   </Button>
                 </div>

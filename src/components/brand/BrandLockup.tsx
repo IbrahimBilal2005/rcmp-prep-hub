@@ -5,6 +5,7 @@ interface BrandLockupProps {
   className?: string;
   subtitle?: string;
   textClassName?: string;
+  textWrapperClassName?: string;
   subtitleClassName?: string;
   size?: "sm" | "md";
   logoShell?: "glass" | "solid";
@@ -14,6 +15,7 @@ const BrandLockup = ({
   className,
   subtitle,
   textClassName,
+  textWrapperClassName,
   subtitleClassName,
   size = "md",
   logoShell = "glass",
@@ -32,7 +34,7 @@ const BrandLockup = ({
       >
         <img src={logo} alt="AptitudeForge logo" className={cn("object-contain", logoSize)} />
       </div>
-      <div className="min-w-0">
+      <div className={cn("min-w-0", textWrapperClassName)}>
         <p
           className={cn(
             "font-heading font-semibold tracking-[0.16em] uppercase text-foreground",

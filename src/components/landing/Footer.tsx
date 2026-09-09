@@ -22,6 +22,7 @@ const Footer = () => {
               <a href="#modules" className="transition-colors hover:text-primary-foreground">Modules</a>
               <a href="#pricing" className="transition-colors hover:text-primary-foreground">Pricing</a>
               <a href="#how-it-works" className="transition-colors hover:text-primary-foreground">How It Works</a>
+              <a href="#preparation-faq" className="transition-colors hover:text-primary-foreground">Preparation FAQ</a>
             </div>
             <p className="text-xs uppercase tracking-[0.22em] text-primary-foreground/30">
               Copyright {new Date().getFullYear()} AptitudeForge. All rights reserved.

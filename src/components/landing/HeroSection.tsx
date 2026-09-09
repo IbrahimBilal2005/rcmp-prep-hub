@@ -39,8 +39,8 @@ const HeroSection = () => {
               transition={revealTransition(0.04)}
               className="flex max-w-5xl flex-col gap-2 pb-3 font-semibold leading-[0.96] tracking-[-0.03em] text-foreground"
             >
-              <span className="block text-[2.65rem] sm:whitespace-nowrap sm:text-[4.45rem] lg:text-[5.45rem]">Prepare smarter.</span>
-              <span className="block text-[2.9rem] text-gradient sm:whitespace-nowrap sm:text-[4.82rem] lg:text-[5.68rem]">Perform better.</span>
+              <span className="block text-[2.65rem] sm:whitespace-nowrap sm:text-[4.45rem] lg:text-[5.45rem]">RCMP test prep.</span>
+              <span className="block text-[2.9rem] text-gradient sm:whitespace-nowrap sm:text-[4.82rem] lg:text-[5.68rem]">Practise smarter.</span>
             </motion.h1>
 
             <motion.div

@@ -1,3 +1,5 @@
+import { getAuthSession } from "@/lib/auth";
+import { practiceFingerprint, readPracticeSession, remainingPracticeSeconds, savePracticeSession } from "@/lib/practiceSession";
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -101,9 +103,9 @@ const LockedMask = ({
       <h3 className="font-heading text-2xl font-semibold text-foreground mb-2">{title}</h3>
       <p className="text-sm text-muted-foreground leading-relaxed mb-5">{body}</p>
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
-        <a href="/signup?step=plan">
+        <Link to="/signup?step=plan">
           <Button variant="locked">Unlock Full Access</Button>
-        </a>
+        </Link>
         <Link to={`/test/${FREE_PREVIEW_TEST_ID}`}>
           <Button variant="outline">Open Free Sample</Button>
         </Link>
@@ -201,6 +203,8 @@ const PracticeTestView = () => {
   const [reviewMeta, setReviewMeta] = useState<{ completedAt: string; timedOut: boolean } | null>(null);
   const [showMemoryStudyMaterial, setShowMemoryStudyMaterial] = useState(true);
 
+  const userId = getAuthSession()?.id ?? "anonymous";
+  const [restoredTest, setRestoredTest] = useState<string | null>(null);
   const persistedAttemptIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -208,43 +212,58 @@ const PracticeTestView = () => {
       return;
     }
 
-    setPhase("intro");
-    setCurrentQ(0);
-    setAnswers(new Array(test.testQuestions.length).fill(null));
-    setTimeLeft(test.time * 60);
+    const draft = readPracticeSession(userId, test);
+    setPhase(draft?.phase ?? "intro");
+    setCurrentQ(draft?.currentQ ?? 0);
+    setAnswers(draft?.answers ?? new Array(test.testQuestions.length).fill(null));
+    setTimeLeft(draft ? remainingPracticeSeconds(draft.startedAt, test.time, draft.reviewMeta ? Date.parse(draft.reviewMeta.completedAt) : Date.now()) : test.time * 60);
     setShowExplanation(null);
-    setStartedAt(null);
-    setReviewMeta(null);
+    setStartedAt(draft?.startedAt ?? null);
+    setReviewMeta(draft?.reviewMeta ?? null);
     setShowMemoryStudyMaterial(true);
-    persistedAttemptIdRef.current = null;
+    persistedAttemptIdRef.current = draft?.reviewMeta ? `${test.id}-${draft.reviewMeta.completedAt}` : null;
     setAttemptHistory(getPracticeAttempts(test.id));
-  }, [test]);
+    setRestoredTest(test.id);
+  }, [test, userId]);
 
   useEffect(() => {
-    if (phase !== "active") {
-      return;
-    }
+    if (phase !== "active" || !startedAt || !test) return;
+    const tick = () => {
+      const remaining = remainingPracticeSeconds(startedAt, test.time);
+      setTimeLeft(remaining);
+      if (remaining === 0) {
+        setReviewMeta({ completedAt: new Date(Date.parse(startedAt) + test.time * 60_000).toISOString(), timedOut: true });
+        setPhase("review");
+      }
+    };
+    tick();
+    const timerId = window.setInterval(tick, 1000);
+    window.addEventListener("focus", tick);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(timerId);
+      window.removeEventListener("focus", tick);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [phase, startedAt, test]);
 
-    if (timeLeft <= 0) {
-      setReviewMeta({ completedAt: new Date().toISOString(), timedOut: true });
-      setPhase("review");
-      return;
-    }
-
-    const timerId = window.setTimeout(() => setTimeLeft((current) => current - 1), 1000);
-    return () => window.clearTimeout(timerId);
-  }, [phase, timeLeft]);
+  useEffect(() => {
+    if (!test || restoredTest !== test.id) return;
+    savePracticeSession(userId, test.id, phase === "intro" || !startedAt ? null : {
+      phase, answers, currentQ, startedAt, reviewMeta, fingerprint: practiceFingerprint(test),
+    });
+  }, [test, userId, restoredTest, phase, answers, currentQ, startedAt, reviewMeta]);
 
   const questions = test?.testQuestions ?? [];
   const totalQuestions = questions.length;
   const totalDurationSeconds = test?.time ? test.time * 60 : 0;
   const answered = answers.filter((answer) => answer !== null).length;
-  const score = answers.reduce((total, answer, index) => total + (isCorrectAnswer(questions[index], answer) ? 1 : 0), 0);
+  const score = answers.reduce((total, answer, index) => total + ((questions[index] && isCorrectAnswer(questions[index], answer)) ? 1 : 0), 0);
   const percentage = totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0;
   const durationSeconds = Math.min(totalDurationSeconds, Math.max(totalDurationSeconds - timeLeft, 0));
   const currentQuestion = questions[currentQ];
   const parsedMemoryQuestion = currentQuestion ? parseMemoryQuestion(currentQuestion.question) : null;
-  const isMemoryTest = test.slug === "memory-quotient-practice" || test.category.toLowerCase() === "memory";
+  const isMemoryTest = test?.slug === "memory-quotient-practice" || test?.category.toLowerCase() === "memory";
   const timeWarning = timeLeft < 60 && phase === "active";
   const bestAttempt = test ? getBestPracticeAttempt(test.id) : null;
   const questionUnlocked = test ? isPreviewTestQuestionUnlocked(test.id, currentQ) : false;
@@ -304,7 +323,7 @@ const PracticeTestView = () => {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-heading font-bold text-foreground mb-4">Test not found</h1>
-          <Link to="/dashboard"><Button>Back to Dashboard</Button></Link>
+          <Link to="/dashboard?tab=tests"><Button>Back to Dashboard</Button></Link>
         </div>
       </div>
     );
@@ -322,7 +341,7 @@ const PracticeTestView = () => {
   };
 
   const startTest = () => {
-    if (locked) {
+    if (locked || totalQuestions === 0) {
       return;
     }
 
@@ -336,7 +355,9 @@ const PracticeTestView = () => {
       return;
     }
 
-    setReviewMeta({ completedAt: new Date().toISOString(), timedOut });
+    const remaining = startedAt ? remainingPracticeSeconds(startedAt, test.time) : timeLeft;
+    setTimeLeft(remaining);
+    setReviewMeta({ completedAt: new Date().toISOString(), timedOut: timedOut || remaining === 0 });
     setPhase("review");
   };
 
@@ -360,7 +381,7 @@ const PracticeTestView = () => {
       <div className="min-h-screen bg-background">
         <header className="sticky top-0 z-50 border-b border-border/70 bg-background/88 backdrop-blur-xl">
           <div className="container mx-auto px-4 flex items-center h-16">
-            <Link to="/dashboard" className="flex items-center gap-2">
+            <Link to="/dashboard?tab=tests" className="flex items-center gap-2">
               <BrandLockup
                 size="sm"
                 subtitle="Practice Tests"
@@ -372,7 +393,7 @@ const PracticeTestView = () => {
         </header>
 
         <div className="container mx-auto max-w-6xl px-4 py-10">
-          <Link to="/dashboard" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-8">
+          <Link to="/dashboard?tab=tests" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-8">
             <ArrowLeft className="h-4 w-4" />
             Back to Dashboard
           </Link>
@@ -408,7 +429,7 @@ const PracticeTestView = () => {
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Button variant="hero" size="xl" className="sm:min-w-[240px]" onClick={startTest} disabled={locked}>
+                  <Button variant="hero" size="xl" className="sm:min-w-[240px]" onClick={startTest} disabled={locked || totalQuestions === 0}>
                     <Play className="h-5 w-5 mr-2" />
                     Start Fresh Attempt
                   </Button>
@@ -480,7 +501,7 @@ const PracticeTestView = () => {
       <div className="min-h-screen bg-background">
         <header className="sticky top-0 z-50 border-b border-border/70 bg-background/88 backdrop-blur-xl">
           <div className="container mx-auto px-4 flex items-center h-16">
-            <Link to="/dashboard" className="flex items-center gap-2">
+            <Link to="/dashboard?tab=tests" className="flex items-center gap-2">
               <BrandLockup
                 size="sm"
                 subtitle="Practice Tests"
@@ -532,14 +553,14 @@ const PracticeTestView = () => {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Button variant="outline" onClick={startTest}>
+              <Button variant="outline" onClick={startTest} disabled={totalQuestions === 0}>
                 <RotateCcw className="h-4 w-4 mr-2" />
                 Attempt Again
               </Button>
               <Button variant="hero" onClick={() => { resetSession(); setPhase("intro"); }}>
                 Review Past Attempts
               </Button>
-              <Link to="/dashboard">
+              <Link to="/dashboard?tab=tests">
                 <Button>Back to Dashboard</Button>
               </Link>
             </div>
