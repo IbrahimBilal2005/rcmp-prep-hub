@@ -52,6 +52,7 @@ interface PracticeTestRow {
   description: string;
   category: string;
   time_limit_minutes: number;
+  is_preview: boolean | null;
   practice_test_questions: QuestionRow[] | null;
 }
 
@@ -155,6 +156,7 @@ const mapPracticeTest = async (test: PracticeTestRow): Promise<PracticeTest> => 
   questions: test.practice_test_questions?.length ?? 0,
   time: test.time_limit_minutes,
   category: test.category,
+  isPreview: test.is_preview === true,
   icon: practiceTestIconBySlug[test.slug] ?? defaultPracticeTestIcon,
   testQuestions: await Promise.all(
     [...(test.practice_test_questions ?? [])]
@@ -219,6 +221,7 @@ export const fetchCourseContent = async (): Promise<CourseContent> => {
           description,
           category,
           time_limit_minutes,
+          is_preview,
           practice_test_questions (
             id,
             question,

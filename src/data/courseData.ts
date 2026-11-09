@@ -47,6 +47,8 @@ export interface PracticeTest {
   questions: number;
   time: number;
   category: string;
+  /** True when the database flags this test as the free-plan preview (practice_tests.is_preview). */
+  isPreview?: boolean;
   icon: LucideIcon;
   testQuestions: QuizQuestion[];
 }

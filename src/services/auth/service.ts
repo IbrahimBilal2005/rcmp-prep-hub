@@ -87,24 +87,6 @@ const updateProfileName = async (userId: string, fullName: string) => {
     .eq("id", userId);
 };
 
-const downgradeExpiredProfile = async (userId: string) => {
-  if (!supabase) {
-    return;
-  }
-
-  const { error } = await supabase
-    .from("profiles")
-    .update({
-      plan: "free",
-      access_expires_at: null,
-    })
-    .eq("id", userId);
-
-  if (error) {
-    console.error("Failed to downgrade expired premium profile", error);
-  }
-};
-
 const buildSessionFromSupabaseUser = async (
   user: NonNullable<Awaited<ReturnType<typeof supabase.auth.getUser>>["data"]["user"]>,
   fallback?: AuthSession | null,
@@ -112,8 +94,9 @@ const buildSessionFromSupabaseUser = async (
   fallback = fallback?.id === user.id ? fallback : null;
   let profile = await loadProfileRow(user.id);
 
+  // Expired access is treated as free here; the hourly expire_premium_access() job updates the row.
+  // Users can no longer write plan/access_expires_at themselves (see protect_profile_privileged_columns).
   if (isPremiumExpired(profile)) {
-    await downgradeExpiredProfile(user.id);
     profile = profile
       ? {
           ...profile,

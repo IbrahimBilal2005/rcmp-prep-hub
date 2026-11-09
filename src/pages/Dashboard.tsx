@@ -20,7 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { initializeAuthSession } from "@/lib/auth";
-import { FREE_PREVIEW_TEST_ID, canAccessModule, canAccessTest, isFreePreviewMode } from "@/lib/access";
+import { canAccessModule, canAccessTest, findPreviewTest, isFreePreviewMode } from "@/lib/access";
 import { getAllModuleProgress, isModuleFullyCompleted } from "@/lib/moduleProgressStorage";
 import {
   getBestPracticeAttempt,
@@ -156,9 +156,9 @@ const Dashboard = () => {
   const getModuleDisplayNumber = (moduleId: number) =>
     modules.findIndex((module) => module.id === moduleId) + 1 || moduleId;
   const accessibleModules = modules.filter((mod, index) => canAccessModule(mod.id, index));
-  const accessibleTests = practiceTests.filter((test) => canAccessTest(test.id));
+  const accessibleTests = practiceTests.filter((test) => canAccessTest(test));
   const previewModule = modules[0];
-  const previewTest = practiceTests.find((test) => test.id === FREE_PREVIEW_TEST_ID) ?? practiceTests[0];
+  const previewTest = findPreviewTest(practiceTests) ?? practiceTests[0];
   const firstAccessibleModule = accessibleModules[0] ?? previewModule;
   const firstAccessibleTest = accessibleTests[0] ?? previewTest;
 
@@ -484,7 +484,7 @@ const Dashboard = () => {
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {practiceTests.map((test, index) => {
                   const meta = testMeta[test.id] ?? { attempts: 0, bestPercentage: null };
-                  const accessible = canAccessTest(test.id);
+                  const accessible = canAccessTest(test);
 
                   return (
                     <motion.div
