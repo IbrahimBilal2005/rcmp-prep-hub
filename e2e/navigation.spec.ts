@@ -2,9 +2,14 @@ import { test, expect, type Page } from "@playwright/test";
 
 const question = { id: 1, question: "What is two plus two?", options: ["Four", "Five"], correct_index: 0, correct_indexes: [0], explanation: "Two plus two equals four.", sort_order: 1 };
 const modules = [{ id: 1, slug: "numerical-skills", title: "Numerical Skills", description: "Develop your numerical reasoning skills.", sort_order: 1,
-  lessons: [1, 2].map((id) => ({ id, title: `Lesson ${id}`, summary: "Learn and practise numerical reasoning.", chapter_label: "Foundations", duration_minutes: 5, sort_order: id, video_path: null, poster_path: null })), module_quiz_questions: [question] }];
-const tests = [{ id: 1, slug: "numerical", title: "Numerical Practice", description: "Test your numerical reasoning.", category: "Numerical", time_limit_minutes: 15,
-  practice_test_questions: [question, { ...question, id: 2, sort_order: 2 }] }];
+  lessons: [1, 2].map((id) => ({ id, title: `Lesson ${id}`, summary: "Learn and practise numerical reasoning.", chapter_label: "Foundations", duration_minutes: 5, sort_order: id, video_path: null, poster_path: null })) }];
+const tests = [{ id: 1, slug: "numerical", title: "Numerical Practice", description: "Test your numerical reasoning.", category: "Numerical", time_limit_minutes: 15 }];
+// Questions now arrive from the get_course_questions() RPC rather than embedded in modules/tests.
+const courseQuestions = [
+  { ...question, kind: "module_quiz", parent_id: 1, question_image_path: null },
+  { ...question, kind: "practice_test", parent_id: 1, question_image_path: null },
+  { ...question, id: 2, sort_order: 2, kind: "practice_test", parent_id: 1, question_image_path: null },
+];
 
 async function prepare(page: Page, role = "user", plan = "premium", signedIn = true) {
   const user = { id: "audit-user", aud: "authenticated", role: "authenticated", email: "test@example.com", user_metadata: {}, app_metadata: {}, created_at: "2026-01-01T00:00:00Z" };
@@ -15,7 +20,7 @@ async function prepare(page: Page, role = "user", plan = "premium", signedIn = t
       return route.fulfill({ json: url.pathname.endsWith("/user") ? user : {} });
     }
     const table = url.pathname.split("/").pop();
-    const data = table === "profiles" ? (url.searchParams.has("id") ? profile : [profile]) : table === "modules" ? modules : table === "practice_tests" ? tests : [];
+    const data = table === "profiles" ? (url.searchParams.has("id") ? profile : [profile]) : table === "modules" ? modules : table === "practice_tests" ? tests : table === "get_course_questions" ? courseQuestions : [];
     await route.fulfill({ json: data });
   });
   if (signedIn) {

@@ -20,7 +20,6 @@ interface ModuleRow {
   description: string;
   sort_order: number;
   lessons: LessonRow[] | null;
-  module_quiz_questions: QuestionRow[] | null;
 }
 
 interface LessonRow {
@@ -34,16 +33,37 @@ interface LessonRow {
   poster_path: string | null;
 }
 
+// One row from the get_course_questions() RPC. Answers and explanations are null unless the
+// caller is entitled to them (full access, or a free preview question); see
+// supabase/migrations/20261123160000_protect_answer_keys_and_videos.sql.
 interface QuestionRow {
+  kind: "module_quiz" | "practice_test";
   id: number;
+  parent_id: number;
   question: string;
   question_image_path: string | null;
   options: unknown[] | null;
   correct_index: number | null;
   correct_indexes: number[] | null;
-  explanation: string;
+  explanation: string | null;
   sort_order: number;
 }
+
+const byQuestionOrder = (a: QuestionRow, b: QuestionRow) => a.sort_order - b.sort_order || a.id - b.id;
+
+const groupQuestions = (rows: QuestionRow[], kind: QuestionRow["kind"]) => {
+  const grouped = new Map<number, QuestionRow[]>();
+  for (const row of rows) {
+    if (row.kind !== kind) continue;
+    const list = grouped.get(row.parent_id) ?? [];
+    list.push(row);
+    grouped.set(row.parent_id, list);
+  }
+  for (const list of grouped.values()) {
+    list.sort(byQuestionOrder);
+  }
+  return grouped;
+};
 
 interface PracticeTestRow {
   id: number;
@@ -53,7 +73,6 @@ interface PracticeTestRow {
   category: string;
   time_limit_minutes: number;
   is_preview: boolean | null;
-  practice_test_questions: QuestionRow[] | null;
 }
 
 const moduleIconBySlug: Record<string, LucideIcon> = {
@@ -116,7 +135,7 @@ const mapQuestion = async (question: QuestionRow): Promise<QuizQuestion> => {
     correctIndexes: Array.isArray(question.correct_indexes)
       ? question.correct_indexes.filter((value): value is number => Number.isInteger(value))
       : [],
-    explanation: question.explanation,
+    explanation: question.explanation ?? "",
   };
 };
 
@@ -130,7 +149,7 @@ const mapLesson = (lesson: LessonRow, index: number): ModuleLesson => ({
   posterUrl: lesson.poster_path,
 });
 
-const mapModule = async (module: ModuleRow): Promise<ModuleInfo> => ({
+const mapModule = async (module: ModuleRow, questions: QuestionRow[]): Promise<ModuleInfo> => ({
   id: module.id,
   slug: module.slug,
   sortOrder: module.sort_order,
@@ -140,29 +159,21 @@ const mapModule = async (module: ModuleRow): Promise<ModuleInfo> => ({
   lessons: [...(module.lessons ?? [])]
     .sort((a, b) => a.sort_order - b.sort_order)
     .map((lesson, index) => mapLesson(lesson, index)),
-  quiz: await Promise.all(
-    [...(module.module_quiz_questions ?? [])]
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .map(mapQuestion),
-  ),
+  quiz: await Promise.all(questions.map(mapQuestion)),
 });
 
-const mapPracticeTest = async (test: PracticeTestRow): Promise<PracticeTest> => ({
+const mapPracticeTest = async (test: PracticeTestRow, questions: QuestionRow[]): Promise<PracticeTest> => ({
   id: test.slug,
   dbId: test.id,
   slug: test.slug,
   title: test.title,
   description: test.description,
-  questions: test.practice_test_questions?.length ?? 0,
+  questions: questions.length,
   time: test.time_limit_minutes,
   category: test.category,
   isPreview: test.is_preview === true,
   icon: practiceTestIconBySlug[test.slug] ?? defaultPracticeTestIcon,
-  testQuestions: await Promise.all(
-    [...(test.practice_test_questions ?? [])]
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .map(mapQuestion),
-  ),
+  testQuestions: await Promise.all(questions.map(mapQuestion)),
 });
 
 export const getEmptyCourseContent = (): CourseContent => ({
@@ -181,7 +192,11 @@ export const fetchCourseContent = async (): Promise<CourseContent> => {
       };
     }
 
-    const [{ data: moduleRows, error: moduleError }, { data: practiceTestRows, error: practiceTestError }] = await Promise.all([
+    const [
+      { data: moduleRows, error: moduleError },
+      { data: practiceTestRows, error: practiceTestError },
+      { data: questionRows, error: questionError },
+    ] = await Promise.all([
       supabase
         .from("modules")
         .select(`
@@ -199,16 +214,6 @@ export const fetchCourseContent = async (): Promise<CourseContent> => {
             sort_order,
             video_path,
             poster_path
-          ),
-          module_quiz_questions (
-            id,
-            question,
-            question_image_path,
-            options,
-            correct_index,
-            correct_indexes,
-            explanation,
-            sort_order
           )
         `)
         .order("sort_order", { ascending: true }),
@@ -221,30 +226,23 @@ export const fetchCourseContent = async (): Promise<CourseContent> => {
           description,
           category,
           time_limit_minutes,
-          is_preview,
-          practice_test_questions (
-            id,
-            question,
-            question_image_path,
-            options,
-            correct_index,
-            correct_indexes,
-            explanation,
-            sort_order
-          )
+          is_preview
         `)
         .order("sort_order", { ascending: true }),
+      supabase.rpc("get_course_questions"),
     ]);
 
-    if (moduleError || practiceTestError || !moduleRows || !practiceTestRows) {
+    if (moduleError || practiceTestError || questionError || !moduleRows || !practiceTestRows || !questionRows) {
       const errorMessage =
         moduleError?.message ||
         practiceTestError?.message ||
+        questionError?.message ||
         "Supabase returned no rows for one or more content queries.";
 
       console.error("Failed to fetch course content from Supabase", {
         moduleError,
         practiceTestError,
+        questionError,
         moduleRows,
         practiceTestRows,
       });
@@ -255,9 +253,19 @@ export const fetchCourseContent = async (): Promise<CourseContent> => {
       };
     }
 
+    const questions = questionRows as QuestionRow[];
+    const quizByModule = groupQuestions(questions, "module_quiz");
+    const questionsByTest = groupQuestions(questions, "practice_test");
+
     return {
-      modules: await Promise.all([...moduleRows].sort((a, b) => a.sort_order - b.sort_order).map(mapModule)),
-      practiceTests: await Promise.all(practiceTestRows.map(mapPracticeTest)),
+      modules: await Promise.all(
+        [...(moduleRows as ModuleRow[])]
+          .sort((a, b) => a.sort_order - b.sort_order || a.id - b.id)
+          .map((module) => mapModule(module, quizByModule.get(module.id) ?? [])),
+      ),
+      practiceTests: await Promise.all(
+        (practiceTestRows as PracticeTestRow[]).map((test) => mapPracticeTest(test, questionsByTest.get(test.id) ?? [])),
+      ),
       source: "supabase",
       error: null,
     };
