@@ -22,6 +22,7 @@ import BrandLockup from "@/components/brand/BrandLockup";
 import { Button } from "@/components/ui/button";
 import {
   FREE_PREVIEW_TEST_ID,
+  findPreviewTest,
   canViewDetailedAnswerFeedback,
   canAccessTest,
   isPreviewTestQuestionUnlocked,
@@ -91,9 +92,11 @@ interface ProgressPanelProps {
 const LockedMask = ({
   title,
   body,
+  previewTestId,
 }: {
   title: string;
   body: string;
+  previewTestId: string;
 }) => (
   <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] bg-background/45 backdrop-blur-[6px]">
     <div className="mx-4 max-w-md rounded-3xl border border-border/70 bg-background/92 p-6 text-center shadow-2xl">
@@ -106,7 +109,7 @@ const LockedMask = ({
         <Link to="/signup?step=plan">
           <Button variant="locked">Unlock Full Access</Button>
         </Link>
-        <Link to={`/test/${FREE_PREVIEW_TEST_ID}`}>
+        <Link to={`/test/${previewTestId}`}>
           <Button variant="outline">Open Free Sample</Button>
         </Link>
       </div>
@@ -191,7 +194,8 @@ const PracticeTestView = () => {
   const practiceTests = (courseContent ?? getEmptyCourseContent()).practiceTests;
   const { id } = useParams();
   const test = practiceTests.find((item) => item.id === id);
-  const locked = test ? !canAccessTest(test.id) : false;
+  const locked = test ? !canAccessTest(test) : false;
+  const previewTestId = findPreviewTest(practiceTests)?.id ?? FREE_PREVIEW_TEST_ID;
 
   const [phase, setPhase] = useState<"intro" | "active" | "review">("intro");
   const [currentQ, setCurrentQ] = useState(0);
@@ -266,7 +270,7 @@ const PracticeTestView = () => {
   const isMemoryTest = test?.slug === "memory-quotient-practice" || test?.category.toLowerCase() === "memory";
   const timeWarning = timeLeft < 60 && phase === "active";
   const bestAttempt = test ? getBestPracticeAttempt(test.id) : null;
-  const questionUnlocked = test ? isPreviewTestQuestionUnlocked(test.id, currentQ) : false;
+  const questionUnlocked = test ? isPreviewTestQuestionUnlocked(test, currentQ) : false;
   const showDetailedFeedback = canViewDetailedAnswerFeedback();
 
   useEffect(() => {
@@ -402,6 +406,7 @@ const PracticeTestView = () => {
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-3xl border border-border/70 p-8 relative overflow-hidden">
               {locked && (
                 <LockedMask
+                  previewTestId={previewTestId}
                   title="Locked timed test"
                   body="This timed test is available with full access."
                 />
@@ -575,12 +580,13 @@ const PracticeTestView = () => {
             {questions.map((question, index) => {
               const userAnswer = answers[index];
               const isCorrect = isCorrectAnswer(question, userAnswer);
-              const reviewQuestionUnlocked = isPreviewTestQuestionUnlocked(test.id, index);
+              const reviewQuestionUnlocked = isPreviewTestQuestionUnlocked(test, index);
 
               return (
                 <div key={index} className="glass-card rounded-2xl border border-border/60 p-5 relative overflow-hidden">
                   {!reviewQuestionUnlocked && (
                     <LockedMask
+                      previewTestId={previewTestId}
                       title="Preview limit"
                       body="Only the first available free-plan questions are open. The rest of the answer review stays masked until full access is unlocked."
                     />
@@ -685,6 +691,7 @@ const PracticeTestView = () => {
             >
               {(!questionUnlocked || locked) && (
                 <LockedMask
+                  previewTestId={previewTestId}
                   title={locked ? "Locked timed test" : "Preview question limit reached"}
                   body={locked
                     ? "This timed test remains visible in the real layout, but its questions stay locked until full access is unlocked."
